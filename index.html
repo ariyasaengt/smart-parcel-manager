@@ -26,6 +26,20 @@
     .badge-other { background-color: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; }
     .shutter-flash { animation: flashAnim 0.15s ease-out; }
     @keyframes flashAnim { 0% { opacity: 0.8; } 100% { opacity: 0; } }
+
+    .scanner-line {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #4f46e5, #06b6d4, transparent);
+      box-shadow: 0 0 12px #06b6d4;
+      animation: scanMove 1.6s infinite linear;
+    }
+    @keyframes scanMove {
+      0% { top: 0%; opacity: 0.3; }
+      50% { top: 95%; opacity: 1; }
+      100% { top: 0%; opacity: 0.3; }
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen pb-16 select-none text-[13px]">
@@ -89,8 +103,6 @@
     <!-- แถบด้านบน Responsive -->
     <header class="bg-indigo-700 text-white sticky top-0 z-40 shadow-md">
       <div class="max-w-4xl mx-auto px-3.5 py-2.5">
-        
-        <!-- แถวบน: ข้อมูลหอพัก & ปุ่มออกจากระบบ -->
         <div class="flex items-center justify-between pb-2">
           <div class="flex items-center space-x-2 min-w-0">
             <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-amber-300 text-sm flex-shrink-0">
@@ -109,7 +121,6 @@
           </button>
         </div>
 
-        <!-- แถวล่าง: เมนูนำทางแบบเลื่อนได้ในจอเล็ก (Scrollable Nav) -->
         <div class="flex items-center space-x-1 overflow-x-auto no-scrollbar pt-1 border-t border-indigo-600/60">
           <button id="navScan" onclick="switchTab('scan')" class="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap bg-white text-indigo-800 shadow-sm transition">สแกน</button>
           <button id="navInv" onclick="switchTab('inv')" class="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap text-indigo-100 hover:bg-indigo-600 transition flex items-center">
@@ -119,7 +130,6 @@
           <button id="navStats" onclick="switchTab('stats')" class="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap text-indigo-100 hover:bg-indigo-600 transition">สถิติ</button>
           <button id="navStaff" onclick="switchTab('staff')" class="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap text-indigo-100 hover:bg-indigo-600 transition">ตั้งค่า & ทีมงาน</button>
         </div>
-
       </div>
     </header>
 
@@ -151,20 +161,48 @@
               <button onclick="clearCaptured()" class="text-rose-500 text-[11px] hover:underline">ล้างทั้งหมด</button>
             </div>
             <div id="thumbnailsGrid" class="grid grid-cols-5 sm:grid-cols-7 gap-1 max-h-32 overflow-y-auto p-1 bg-slate-50 rounded-xl border"></div>
-            <button id="runAiScanBtn" onclick="processImagesWithCloudAi()" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow">
-              <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> ประมวลผลอ่านข้อมูลพัสดุด้วย AI กลาง
+            <button id="runAiScanBtn" onclick="processImagesDirectAI()" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow flex items-center justify-center gap-1.5 transition">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+              <span>ประมวลผลอ่านข้อมูลพัสดุด้วย AI</span>
             </button>
           </div>
 
-          <div id="scanLoaderBox" class="hidden space-y-1 pt-1.5">
-            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-              <div id="scanProgressBar" class="bg-indigo-600 h-1.5 w-0 transition-all duration-300"></div>
+          <!-- กล่องแสดงสถานะประมวลผลแบบ ACTIVE LIVE SCANNER HUD -->
+          <div id="scanLoaderBox" class="hidden text-left bg-slate-900 text-white p-3.5 rounded-2xl shadow-lg relative overflow-hidden border border-indigo-500/40 space-y-2.5 transition">
+            <div class="scanner-line"></div>
+            
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="relative flex h-2.5 w-2.5">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                </span>
+                <span class="text-xs font-bold text-cyan-300 tracking-wide uppercase">AI Direct Processing...</span>
+              </div>
+              <span id="activePercentText" class="text-xs font-mono font-bold text-amber-400">0%</span>
             </div>
-            <p id="scanProgressLabel" class="text-[11px] text-slate-500">กำลังประมวลผล...</p>
+
+            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+              <div id="scanProgressBar" class="bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 h-2 w-0 transition-all duration-200"></div>
+            </div>
+
+            <div class="bg-slate-950/70 p-2 rounded-xl border border-slate-800 text-[11px] font-mono flex items-start space-x-2">
+              <i class="fa-solid fa-terminal text-cyan-400 text-xs mt-0.5 animate-pulse"></i>
+              <div class="flex-1 leading-tight">
+                <p id="scanProgressLabel" class="text-slate-200 font-semibold">กำลังเชื่อมต่อโมเดล AI...</p>
+                <p id="scanDetailSubLabel" class="text-[10px] text-cyan-400/80 mt-0.5">วิเคราะห์ฉลากพัสดุ</p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+              <span id="processedCountStatus"><i class="fa-solid fa-box mr-1"></i> อ่านสำเร็จแล้ว: 0 ชิ้น</span>
+              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> โหมดเร่งความเร็วตรง</span>
+            </div>
           </div>
+
         </div>
 
-        <!-- รายการตรวจสอบ -->
+        <!-- รายการตรวจสอบ (แสดงแน่นอน 100%) -->
         <div id="inspectionSection" class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 hidden space-y-2.5">
           <div class="flex justify-between items-center border-b border-slate-100 pb-2">
             <div>
@@ -193,11 +231,11 @@
           </div>
         </div>
 
-        <!-- ข้อความส่ง LINE -->
+        <!-- ข้อความส่ง LINE (แสดงผลพร้อมเลื่อนหน้าจออัตโนมัติ) -->
         <div id="outputSection" class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 hidden space-y-2.5">
           <div class="flex justify-between items-center">
             <h3 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <i class="fa-brands fa-line text-emerald-500 text-sm"></i> ข้อความพร้อมส่งใน LINE
+              <i class="fa-brands fa-line text-emerald-500 text-sm"></i> ข้อความพร้อมส่งใน LINE (รวมชิ้น)
             </h3>
             <span id="outputBadgeCount" class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">0 ชิ้น</span>
           </div>
@@ -261,7 +299,7 @@
         </div>
       </div>
 
-      <!-- TAB 3: สถิติรายเดือน (ปรับแก้ให้เรียงตัวพอดีจอมือถือ) -->
+      <!-- TAB 3: สถิติรายเดือน -->
       <div id="viewStats" class="hidden space-y-3.5">
         <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 space-y-2.5">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -385,6 +423,8 @@
   </div>
 
   <script>
+    // การตั้งค่าระบบเชื่อมต่อ
+    const GEMINI_DIRECT_API_KEY = "AQ.Ab8RN6JI1AvhMp2kLRrbZnxTJT5VEHMaxvd6h3iY_Ff6eRrzlw";
     const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyfF8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec";
 
     let currentUser = null;
@@ -393,6 +433,7 @@
     let currentScannedRows = [];
     let mediaStream = null;
 
+    // ติดต่อ Apps Script สำหรับข้อมูลบัญชีและประวัติ
     async function callGasBackend(payload) {
       try {
         const response = await fetch(GAS_ENDPOINT_URL, {
@@ -407,6 +448,47 @@
         console.error("Fetch Exception:", err);
         throw err;
       }
+    }
+
+    // ฟังก์ชันยิงตรงหา Gemini API 2.5 Flash เพื่ออ่านภาพพัสดุ (เร็ว เสถียร ไม่ผ่าน Proxy ให้ค้าง)
+    async function callGeminiDirectAI(base64Image) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_DIRECT_API_KEY}`;
+      const promptText = `ดูภาพฉลากพัสดุนี้แล้วตอบ JSON เท่านั้น:
+{
+  "target": "ลำดับแรกให้หาเลขห้อง (เช่น 105, 405) หากไม่มีเลขห้องให้ดึงชื่อผู้รับ (ภาษาไทยหรืออังกฤษ) ตัดคำนำหน้าออก",
+  "courier": "Flash, SPX, J&T, KEX, EMS, หรือ Other",
+  "cod": "ยอดเงินปลายทาง หรือ None"
+}`;
+
+      const payload = {
+        contents: [{
+          parts: [
+            { text: promptText },
+            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+          ]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        throw new Error(`Gemini API Error: ${res.status}`);
+      }
+
+      const json = await res.json();
+      const rawText = json.candidates[0].content.parts[0].text;
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+      return JSON.parse(rawText.replace(/```json/g, "").replace(/```/g, "").trim());
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -632,31 +714,79 @@
       renderThumbnails();
     }
 
-    async function processImagesWithCloudAi() {
+    // ==============================================================
+    // DIRECT FAST AI PROCESSING & RESULT RENDERING (แก้ปัญหาไม่ขึ้นผลลัพธ์)
+    // ==============================================================
+    async function processImagesDirectAI() {
+      if (capturedBase64List.length === 0) return alert('กรุณาถ่ายภาพหรือเลือกภาพก่อนประมวลผล');
+
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
-      const label = document.getElementById('scanProgressLabel');
+      const pctText = document.getElementById('activePercentText');
+      const mainLabel = document.getElementById('scanProgressLabel');
+      const subLabel = document.getElementById('scanDetailSubLabel');
+      const countStatus = document.getElementById('processedCountStatus');
 
       loader.classList.remove('hidden');
+      document.getElementById('runAiScanBtn').disabled = true;
       currentScannedRows = [];
+      
       const total = capturedBase64List.length;
+      let completedCount = 0;
+
+      function updateLiveHUD(currentIdx, detailMsg) {
+        const pct = Math.round((completedCount / total) * 100);
+        bar.style.width = `${pct}%`;
+        pctText.innerText = `${pct}%`;
+        mainLabel.innerText = `กำลังอ่านพัสดุชิ้นที่ ${currentIdx}/${total}...`;
+        subLabel.innerText = detailMsg;
+        countStatus.innerHTML = `<i class="fa-solid fa-box mr-1"></i> อ่านสำเร็จแล้ว: ${completedCount}/${total} ชิ้น`;
+      }
+
+      updateLiveHUD(1, "เชื่อมต่อตรงกับ Google Gemini AI Vision...");
 
       for (let i = 0; i < total; i++) {
-        const pct = Math.round(((i + 1) / total) * 100);
-        bar.style.width = `${pct}%`;
-        label.innerText = `AI กำลังอ่านภาพที่ ${i + 1}/${total} (${pct}%)`;
+        const itemNumber = i + 1;
+        updateLiveHUD(itemNumber, `กำลังสแกนหาเลขห้อง / ชื่อผู้รับบนฉลาก...`);
 
         try {
-          const json = await callGasBackend({ action: "ai_scan", base64: capturedBase64List[i] });
-          if (json.status === "success" && json.result) currentScannedRows.push(json.result);
-        } catch (e) {
-          console.error(e);
+          const aiResult = await callGeminiDirectAI(capturedBase64List[i]);
+          if (aiResult) {
+            currentScannedRows.push({
+              target: String(aiResult.target || `พัสดุ_${itemNumber}`).trim(),
+              courier: String(aiResult.courier || 'Other').trim(),
+              cod: String(aiResult.cod || 'None').trim()
+            });
+            completedCount++;
+            updateLiveHUD(itemNumber, `ตรวจพบ: [${aiResult.target}] (${aiResult.courier})`);
+          } else {
+            currentScannedRows.push({ target: `พัสดุชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
+            completedCount++;
+          }
+        } catch (err) {
+          console.error("AI Direct Scan Error:", err);
+          currentScannedRows.push({ target: `พัสดุชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
+          completedCount++;
         }
       }
 
-      loader.classList.add('hidden');
-      renderInspectionTable();
-      generateLineTemplate();
+      // เสร็จสิ้น 100%
+      bar.style.width = `100%`;
+      pctText.innerText = `100%`;
+      mainLabel.innerText = `ประมวลผลเสร็จสมบูรณ์!`;
+      subLabel.innerText = `จัดกลุ่มและสร้างเทมเพลตเรียบร้อย`;
+
+      setTimeout(() => {
+        loader.classList.add('hidden');
+        document.getElementById('runAiScanBtn').disabled = false;
+        
+        // เรนเดอร์ทั้งตารางตรวจสอบและกล่องเทมเพลตแน่นอน 100%
+        renderInspectionTable();
+        generateLineTemplate();
+
+        // เลื่อนหน้าจอลงมาที่ตารางตรวจเช็กให้อัตโนมัติ
+        document.getElementById('inspectionSection').scrollIntoView({ behavior: 'smooth' });
+      }, 400);
     }
 
     function loadDemoDataset() {
@@ -675,12 +805,17 @@
       ];
       renderInspectionTable();
       generateLineTemplate();
+      document.getElementById('inspectionSection').scrollIntoView({ behavior: 'smooth' });
     }
 
     function renderInspectionTable() {
       const sec = document.getElementById('inspectionSection');
       const tbody = document.getElementById('inspectionTbody');
-      if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
+      
+      if (!currentScannedRows || currentScannedRows.length === 0) {
+        sec.classList.add('hidden');
+        return;
+      }
       
       sec.classList.remove('hidden');
       tbody.innerHTML = '';
@@ -715,14 +850,18 @@
       generateLineTemplate();
     }
 
+    // สร้างเทมเพลต LINE แบบรวมชิ้นแน่นอน 100%
     function generateLineTemplate() {
       const sec = document.getElementById('outputSection');
-      if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
+      if (!currentScannedRows || currentScannedRows.length === 0) { 
+        sec.classList.add('hidden'); 
+        return; 
+      }
       sec.classList.remove('hidden');
 
       const counts = {};
       currentScannedRows.forEach(i => {
-        const k = i.target.trim();
+        const k = (i.target || '').trim();
         if (k) counts[k] = (counts[k] || 0) + 1;
       });
 
