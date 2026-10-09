@@ -233,23 +233,30 @@
 
   <script>
     // ==============================================================
-    // ใส่ URL ตัวจริงของคุณเรียบร้อยแล้ว
+    // ใส่ URL ตัวใหม่ล่าสุดของคุณเรียบร้อยแล้ว
     // ==============================================================
-    const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbyub7qIX35goYqB4LTgemsxPdzd0xEnzC3JXXxfnTZusm4zo8K989O4TpWmKNPztyWthQ/exec";
+    const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyfF8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec";
 
     let currentUser = null;
     let capturedBase64List = [];
     let currentScannedRows = [];
     let mediaStream = null;
 
-    // ฟังก์ชันส่ง Request ไปยัง Apps Script โดยหลบเลี่ยงปัญหา CORS
+    // ฟังก์ชันส่ง Request ไปยัง Apps Script รองรับ Redirect และ Text/Plain เพื่อเลี่ยงปัญหา CORS
     async function callGasBackend(payload) {
-      const response = await fetch(GAS_ENDPOINT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      });
-      return await response.json();
+      try {
+        const response = await fetch(GAS_ENDPOINT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          redirect: 'follow'
+        });
+        const text = await response.text();
+        return JSON.parse(text);
+      } catch (err) {
+        console.error("Fetch Exception:", err);
+        throw err;
+      }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -298,7 +305,7 @@
           alert(json.message || "ล็อกอินไม่สำเร็จ");
         }
       } catch (err) {
-        alert("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต");
+        alert("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ต");
       }
       btn.disabled = false;
       btn.innerText = "เข้าสู่ระบบ";
@@ -326,7 +333,7 @@
           alert(json.message || "ลงทะเบียนไม่สำเร็จ");
         }
       } catch (err) {
-        alert("เกิดข้อผิดพลาดในการเชื่อมต่อ ตรวจสอบ URL หรือสิทธิ์ใน Apps Script");
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง");
       }
       btn.disabled = false;
       btn.innerText = "สร้างหอพักและเปิดใช้งาน";
@@ -551,7 +558,7 @@
     async function fetchDormInventory(showAlert) {
       if (!currentUser) return;
       try {
-        const res = await fetch(`${GAS_ENDPOINT_URL}?dormId=${currentUser.dormId}`);
+        const res = await fetch(`${GAS_ENDPOINT_URL}?dormId=${encodeURIComponent(currentUser.dormId)}`);
         const json = await res.json();
         const container = document.getElementById('inventoryContainer');
         container.innerHTML = '';
