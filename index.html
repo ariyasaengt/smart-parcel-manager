@@ -380,6 +380,9 @@
   </div>
 
   <script>
+    // ==========================================
+    // ตัวแปรตั้งค่าระบบ
+    // ==========================================
     const GEMINI_DIRECT_API_KEY = "AQ.Ab8RN6JI1AvhMp2kLRrbZnxTJT5VEHMaxvd6h3iY_Ff6eRrzlw";
     const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyfF8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec";
 
@@ -406,13 +409,18 @@
     }
 
     // =========================================================
-    // ฟังก์ชันอ่านภาพด้วย Gemini AI (แม่นยำสูง ดึงเลขห้อง หรือชื่อผู้รับ)
+    // ฟังก์ชันอ่านภาพด้วย Gemini AI (ปรับปรุง Endpoint สำหรับคีย์ AQ.)
     // =========================================================
     async function callGeminiDirectOCR(base64Image) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
-      
+      // ใช้โมเดล gemini-3.6-flash หรือ gemini-1.5-flash-latest พร้อมส่งทั้ง query param และ header
+      const endpointModels = [
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+      ];
+
       const prompt = `ภาพนี้คือฉลากหน้ากล่องพัสดุ ช่วยอ่านข้อความดังต่อไปนี้:
-1. ให้หา "เลขห้อง" เป็นอันดับแรก (เช่น 105, 205, 405, 408) หรือถ้าไม่มีเลขห้องให้หา "ชื่อผู้รับ" (เช่น ศศิณา, พุธิตา, ทิฟฟี่แผงสีเขียว หรือชื่อภาษาอังกฤษ)
+1. "เลขห้อง" (เช่น 105, 205, 405, 408) หรือถ้าไม่มีเลขห้องให้หา "ชื่อผู้รับ" (เช่น ศศิณา, พุธิตา, ทิฟฟี่แผงสีเขียว หรือชื่อภาษาอังกฤษ)
 2. ค่ายขนส่ง (เช่น SPX, Flash, J&T, KEX, EMS หรือ Other)
 3. ยอดเงินเก็บปลายทาง COD (ถ้าไม่มีให้ตอบ None)
 
@@ -430,53 +438,65 @@ COD: [ยอดเงิน หรือ None]`;
         }]
       };
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-goog-api-key': GEMINI_DIRECT_API_KEY
-        },
-        body: JSON.stringify(payload)
-      });
+      let lastError = null;
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error("Gemini Error:", errText);
-        throw new Error("Gemini API Error: " + res.status);
+      // ลองยิงตามลำดับโมเดล เพื่อแก้ปัญหาความเข้ากันได้ของคีย์ AQ.
+      for (let baseUrl of endpointModels) {
+        try {
+          const url = `${baseUrl}?key=${encodeURIComponent(GEMINI_DIRECT_API_KEY)}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': GEMINI_DIRECT_API_KEY
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) {
+            const errTxt = await res.text();
+            lastError = new Error(`HTTP ${res.status}: ${errTxt}`);
+            continue; // ลองโมเดลถัดไป
+          }
+
+          const json = await res.json();
+          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+          let target = "";
+          let courier = "Other";
+          let cod = "None";
+
+          const targetMatch = rawText.match(/TARGET:\s*([^\n\r]+)/i);
+          if (targetMatch && targetMatch[1]) {
+            target = targetMatch[1].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
+          }
+
+          const courierMatch = rawText.match(/COURIER:\s*([^\n\r]+)/i);
+          if (courierMatch && courierMatch[1]) {
+            const c = courierMatch[1].trim();
+            if (/flash/i.test(c)) courier = 'Flash';
+            else if (/spx|shopee/i.test(c)) courier = 'SPX';
+            else if (/j&t|jnt/i.test(c)) courier = 'J&T';
+            else if (/kex|kerry/i.test(c)) courier = 'KEX';
+            else if (/ems|ไปรษณีย์/i.test(c)) courier = 'EMS';
+          }
+
+          const codMatch = rawText.match(/COD:\s*([^\n\r]+)/i);
+          if (codMatch && codMatch[1]) {
+            cod = codMatch[1].trim();
+          }
+
+          if (!target) {
+            target = rawText.split('\n')[0].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
+          }
+
+          return { target: target || "ไม่ระบุ", courier, cod };
+        } catch (e) {
+          lastError = e;
+        }
       }
 
-      const json = await res.json();
-      const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      let target = "";
-      let courier = "Other";
-      let cod = "None";
-
-      const targetMatch = rawText.match(/TARGET:\s*([^\n\r]+)/i);
-      if (targetMatch && targetMatch[1]) {
-        target = targetMatch[1].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
-      }
-
-      const courierMatch = rawText.match(/COURIER:\s*([^\n\r]+)/i);
-      if (courierMatch && courierMatch[1]) {
-        const c = courierMatch[1].trim();
-        if (/flash/i.test(c)) courier = 'Flash';
-        else if (/spx|shopee/i.test(c)) courier = 'SPX';
-        else if (/j&t|jnt/i.test(c)) courier = 'J&T';
-        else if (/kex|kerry/i.test(c)) courier = 'KEX';
-        else if (/ems|ไปรษณีย์/i.test(c)) courier = 'EMS';
-      }
-
-      const codMatch = rawText.match(/COD:\s*([^\n\r]+)/i);
-      if (codMatch && codMatch[1]) {
-        cod = codMatch[1].trim();
-      }
-
-      if (!target) {
-        target = rawText.split('\n')[0].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
-      }
-
-      return { target: target || "ไม่ระบุ", courier, cod };
+      throw lastError || new Error("Failed to process image with Gemini");
     }
 
     // ประมวลผลภาพทั้งหมด + สั่ง Auto-save ลงชีตอัตโนมัติ
@@ -1083,8 +1103,7 @@ COD: [ยอดเงิน หรือ None]`;
             let w = img.width, h = img.height;
             if (w > maxW) { h = (maxW / w) * h; w = maxW; }
             canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, w, h);
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
             resolve(canvas.toDataURL('image/jpeg', 0.88).split(',')[1]);
           };
         };
