@@ -233,9 +233,9 @@
 
   <script>
     // ==============================================================
-    // สำคัญที่สุด: วาง Web App URL จริงของคุณลงในเครื่องหมายคำพูดด้านล่าง
+    // ใส่ URL ตัวจริงของคุณเรียบร้อยแล้ว
     // ==============================================================
-    const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycb.../exec";
+    const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbyub7qIX35goYqB4LTgemsxPdzd0xEnzC3JXXxfnTZusm4zo8K989O4TpWmKNPztyWthQ/exec";
 
     let currentUser = null;
     let capturedBase64List = [];
@@ -298,7 +298,7 @@
           alert(json.message || "ล็อกอินไม่สำเร็จ");
         }
       } catch (err) {
-        alert("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบ URL หรืออินเทอร์เน็ต");
+        alert("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต");
       }
       btn.disabled = false;
       btn.innerText = "เข้าสู่ระบบ";
@@ -326,7 +326,7 @@
           alert(json.message || "ลงทะเบียนไม่สำเร็จ");
         }
       } catch (err) {
-        alert("เกิดข้อผิดพลาดในการเชื่อมต่อ ตรวจสอบ URL ใน index.html");
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อ ตรวจสอบ URL หรือสิทธิ์ใน Apps Script");
       }
       btn.disabled = false;
       btn.innerText = "สร้างหอพักและเปิดใช้งาน";
