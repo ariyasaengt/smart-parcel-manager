@@ -161,7 +161,7 @@
               <button onclick="clearCaptured()" class="text-rose-500 text-[11px] hover:underline">ล้างทั้งหมด</button>
             </div>
             <div id="thumbnailsGrid" class="grid grid-cols-5 sm:grid-cols-7 gap-1 max-h-32 overflow-y-auto p-1 bg-slate-50 rounded-xl border"></div>
-            <button id="runAiScanBtn" onclick="processImagesDirectAI()" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow flex items-center justify-center gap-1.5 transition">
+            <button id="runAiScanBtn" onclick="processImagesViaCloud()" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow flex items-center justify-center gap-1.5 transition">
               <i class="fa-solid fa-wand-magic-sparkles"></i>
               <span>ประมวลผลอ่านข้อมูลพัสดุด้วย AI</span>
             </button>
@@ -177,7 +177,7 @@
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
                   <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
                 </span>
-                <span class="text-xs font-bold text-cyan-300 tracking-wide uppercase">AI Direct Processing...</span>
+                <span class="text-xs font-bold text-cyan-300 tracking-wide uppercase">AI Cloud Scanning...</span>
               </div>
               <span id="activePercentText" class="text-xs font-mono font-bold text-amber-400">0%</span>
             </div>
@@ -189,14 +189,14 @@
             <div class="bg-slate-950/70 p-2 rounded-xl border border-slate-800 text-[11px] font-mono flex items-start space-x-2">
               <i class="fa-solid fa-terminal text-cyan-400 text-xs mt-0.5 animate-pulse"></i>
               <div class="flex-1 leading-tight">
-                <p id="scanProgressLabel" class="text-slate-200 font-semibold">กำลังเชื่อมต่อโมเดล AI...</p>
-                <p id="scanDetailSubLabel" class="text-[10px] text-cyan-400/80 mt-0.5">วิเคราะห์ฉลากพัสดุ</p>
+                <p id="scanProgressLabel" class="text-slate-200 font-semibold">กำลังเชื่อมต่อ AI Cloud...</p>
+                <p id="scanDetailSubLabel" class="text-[10px] text-cyan-400/80 mt-0.5">เริ่มวิเคราะห์เลขห้องและผู้รับ</p>
               </div>
             </div>
 
             <div class="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
               <span id="processedCountStatus"><i class="fa-solid fa-box mr-1"></i> อ่านสำเร็จแล้ว: 0 ชิ้น</span>
-              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> โหมดเร่งความเร็วตรง</span>
+              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> โหมด Cloud Scanner</span>
             </div>
           </div>
 
@@ -423,8 +423,6 @@
   </div>
 
   <script>
-    // การตั้งค่าระบบเชื่อมต่อ
-    const GEMINI_DIRECT_API_KEY = "AQ.Ab8RN6JI1AvhMp2kLRrbZnxTJT5VEHMaxvd6h3iY_Ff6eRrzlw";
     const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyfF8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec";
 
     let currentUser = null;
@@ -433,7 +431,6 @@
     let currentScannedRows = [];
     let mediaStream = null;
 
-    // ติดต่อ Apps Script สำหรับข้อมูลบัญชีและประวัติ
     async function callGasBackend(payload) {
       try {
         const response = await fetch(GAS_ENDPOINT_URL, {
@@ -450,54 +447,12 @@
       }
     }
 
-    // ฟังก์ชันยิงตรงหา Gemini API 2.5 Flash เพื่ออ่านภาพพัสดุ (เร็ว เสถียร ไม่ผ่าน Proxy ให้ค้าง)
-    async function callGeminiDirectAI(base64Image) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_DIRECT_API_KEY}`;
-      const promptText = `ดูภาพฉลากพัสดุนี้แล้วตอบ JSON เท่านั้น:
-{
-  "target": "ลำดับแรกให้หาเลขห้อง (เช่น 105, 405) หากไม่มีเลขห้องให้ดึงชื่อผู้รับ (ภาษาไทยหรืออังกฤษ) ตัดคำนำหน้าออก",
-  "courier": "Flash, SPX, J&T, KEX, EMS, หรือ Other",
-  "cod": "ยอดเงินปลายทาง หรือ None"
-}`;
-
-      const payload = {
-        contents: [{
-          parts: [
-            { text: promptText },
-            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
-          ]
-        }],
-        generationConfig: {
-          responseMimeType: "application/json"
-        }
-      };
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        throw new Error(`Gemini API Error: ${res.status}`);
-      }
-
-      const json = await res.json();
-      const rawText = json.candidates[0].content.parts[0].text;
-      const match = rawText.match(/\{[\s\S]*\}/);
-      if (match) {
-        return JSON.parse(match[0]);
-      }
-      return JSON.parse(rawText.replace(/```json/g, "").replace(/```/g, "").trim());
-    }
-
     document.addEventListener('DOMContentLoaded', async () => {
       const savedUser = localStorage.getItem('dorm_auth_user');
       if (savedUser) {
         try {
           currentUser = JSON.parse(savedUser);
           initMainApp();
-          verifySessionWithCloud();
         } catch (e) {
           localStorage.removeItem('dorm_auth_user');
           document.getElementById('authScreen').classList.remove('hidden');
@@ -520,24 +475,6 @@
       document.getElementById('statsMonthPicker').addEventListener('change', renderMonthlyStats);
       document.getElementById('statsSearchRoomInput').addEventListener('input', renderMonthlyStats);
     });
-
-    async function verifySessionWithCloud() {
-      if (!currentUser) return;
-      try {
-        const json = await callGasBackend({ 
-          action: "verify_session", 
-          username: currentUser.username, 
-          dormId: currentUser.dormId 
-        });
-        if (json.status === "success" && json.user) {
-          currentUser = json.user;
-          localStorage.setItem('dorm_auth_user', JSON.stringify(currentUser));
-          applyUserSettingsToUI();
-        }
-      } catch (e) {
-        console.warn("Could not re-verify session with cloud:", e);
-      }
-    }
 
     function switchAuthTab(tab) {
       document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
@@ -689,10 +626,15 @@
       flash.classList.add('shutter-flash');
       setTimeout(() => flash.classList.remove('shutter-flash'), 150);
 
-      cvs.width = vid.videoWidth || 800;
-      cvs.height = vid.videoHeight || 600;
-      cvs.getContext('2d').drawImage(vid, 0, 0);
-      const b64 = cvs.toDataURL('image/jpeg', 0.8).split(',')[1];
+      const maxW = 900;
+      let w = vid.videoWidth || 800;
+      let h = vid.videoHeight || 600;
+      if (w > maxW) { h = (maxW / w) * h; w = maxW; }
+
+      cvs.width = w;
+      cvs.height = h;
+      cvs.getContext('2d').drawImage(vid, 0, 0, w, h);
+      const b64 = cvs.toDataURL('image/jpeg', 0.82).split(',')[1];
       capturedBase64List.push(b64);
       document.getElementById('snapCountThumb').innerText = `${capturedBase64List.length} รูป`;
     }
@@ -715,9 +657,9 @@
     }
 
     // ==============================================================
-    // DIRECT FAST AI PROCESSING & RESULT RENDERING (แก้ปัญหาไม่ขึ้นผลลัพธ์)
+    // CLOUD PROCESSING ผ่าน Google Apps Script Backend (ได้ผลลัพธ์แบบ Demo 100%)
     // ==============================================================
-    async function processImagesDirectAI() {
+    async function processImagesViaCloud() {
       if (capturedBase64List.length === 0) return alert('กรุณาถ่ายภาพหรือเลือกภาพก่อนประมวลผล');
 
       const loader = document.getElementById('scanLoaderBox');
@@ -743,28 +685,28 @@
         countStatus.innerHTML = `<i class="fa-solid fa-box mr-1"></i> อ่านสำเร็จแล้ว: ${completedCount}/${total} ชิ้น`;
       }
 
-      updateLiveHUD(1, "เชื่อมต่อตรงกับ Google Gemini AI Vision...");
+      updateLiveHUD(1, "ส่งภาพไปยัง AI Cloud...");
 
       for (let i = 0; i < total; i++) {
         const itemNumber = i + 1;
         updateLiveHUD(itemNumber, `กำลังสแกนหาเลขห้อง / ชื่อผู้รับบนฉลาก...`);
 
         try {
-          const aiResult = await callGeminiDirectAI(capturedBase64List[i]);
-          if (aiResult) {
+          const res = await callGasBackend({ action: "ai_scan", base64: capturedBase64List[i] });
+          if (res && res.status === "success" && res.result) {
             currentScannedRows.push({
-              target: String(aiResult.target || `พัสดุ_${itemNumber}`).trim(),
-              courier: String(aiResult.courier || 'Other').trim(),
-              cod: String(aiResult.cod || 'None').trim()
+              target: String(res.result.target || `พัสดุ_${itemNumber}`).trim(),
+              courier: String(res.result.courier || 'Other').trim(),
+              cod: String(res.result.cod || 'None').trim()
             });
             completedCount++;
-            updateLiveHUD(itemNumber, `ตรวจพบ: [${aiResult.target}] (${aiResult.courier})`);
+            updateLiveHUD(itemNumber, `ตรวจพบ: [${res.result.target}] (${res.result.courier})`);
           } else {
             currentScannedRows.push({ target: `พัสดุชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
             completedCount++;
           }
         } catch (err) {
-          console.error("AI Direct Scan Error:", err);
+          console.error("AI Scan Error:", err);
           currentScannedRows.push({ target: `พัสดุชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
           completedCount++;
         }
@@ -850,7 +792,6 @@
       generateLineTemplate();
     }
 
-    // สร้างเทมเพลต LINE แบบรวมชิ้นแน่นอน 100%
     function generateLineTemplate() {
       const sec = document.getElementById('outputSection');
       if (!currentScannedRows || currentScannedRows.length === 0) { 
@@ -1120,6 +1061,7 @@
       link.click();
     }
 
+    // ฟังก์ชันบีบอัดรูปภาพให้ขนาดพอเหมาะ คมชัดพอสำหรับ OCR และส่งได้รวดเร็ว
     function fileToBase64(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -1134,7 +1076,7 @@
             if (w > maxW) { h = (maxW / w) * h; w = maxW; }
             canvas.width = w; canvas.height = h;
             canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.82).split(',')[1]);
           };
         };
       });
