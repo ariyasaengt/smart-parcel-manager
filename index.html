@@ -196,7 +196,7 @@
 
             <div class="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
               <span id="processedCountStatus"><i class="fa-solid fa-box mr-1"></i> อ่านสำเร็จแล้ว: 0 ชิ้น</span>
-              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> โหมด Cloud Scanner</span>
+              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> กำลังอ่านฉลากพัสดุ</span>
             </div>
           </div>
 
@@ -453,6 +453,7 @@
         try {
           currentUser = JSON.parse(savedUser);
           initMainApp();
+          verifySessionWithCloud();
         } catch (e) {
           localStorage.removeItem('dorm_auth_user');
           document.getElementById('authScreen').classList.remove('hidden');
@@ -475,6 +476,24 @@
       document.getElementById('statsMonthPicker').addEventListener('change', renderMonthlyStats);
       document.getElementById('statsSearchRoomInput').addEventListener('input', renderMonthlyStats);
     });
+
+    async function verifySessionWithCloud() {
+      if (!currentUser) return;
+      try {
+        const json = await callGasBackend({ 
+          action: "verify_session", 
+          username: currentUser.username, 
+          dormId: currentUser.dormId 
+        });
+        if (json.status === "success" && json.user) {
+          currentUser = json.user;
+          localStorage.setItem('dorm_auth_user', JSON.stringify(currentUser));
+          applyUserSettingsToUI();
+        }
+      } catch (e) {
+        console.warn("Could not re-verify session with cloud:", e);
+      }
+    }
 
     function switchAuthTab(tab) {
       document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
@@ -693,21 +712,22 @@
 
         try {
           const res = await callGasBackend({ action: "ai_scan", base64: capturedBase64List[i] });
-          if (res && res.status === "success" && res.result) {
+          if (res && res.status === "success" && res.result && res.result.target && res.result.target !== "ไม่ระบุ") {
             currentScannedRows.push({
-              target: String(res.result.target || `พัสดุ_${itemNumber}`).trim(),
+              target: String(res.result.target).trim(),
               courier: String(res.result.courier || 'Other').trim(),
               cod: String(res.result.cod || 'None').trim()
             });
             completedCount++;
             updateLiveHUD(itemNumber, `ตรวจพบ: [${res.result.target}] (${res.result.courier})`);
           } else {
-            currentScannedRows.push({ target: `พัสดุชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
+            // หากอ่านฉลากไม่ชัดเจน ให้คงเป็นกล่องที่ต้องตรวจสอบ
+            currentScannedRows.push({ target: `ตรวจสอบชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
             completedCount++;
           }
         } catch (err) {
           console.error("AI Scan Error:", err);
-          currentScannedRows.push({ target: `พัสดุชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
+          currentScannedRows.push({ target: `ตรวจสอบชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
           completedCount++;
         }
       }
@@ -722,11 +742,9 @@
         loader.classList.add('hidden');
         document.getElementById('runAiScanBtn').disabled = false;
         
-        // เรนเดอร์ทั้งตารางตรวจสอบและกล่องเทมเพลตแน่นอน 100%
         renderInspectionTable();
         generateLineTemplate();
 
-        // เลื่อนหน้าจอลงมาที่ตารางตรวจเช็กให้อัตโนมัติ
         document.getElementById('inspectionSection').scrollIntoView({ behavior: 'smooth' });
       }, 400);
     }
@@ -1061,7 +1079,6 @@
       link.click();
     }
 
-    // ฟังก์ชันบีบอัดรูปภาพให้ขนาดพอเหมาะ คมชัดพอสำหรับ OCR และส่งได้รวดเร็ว
     function fileToBase64(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
