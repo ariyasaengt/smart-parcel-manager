@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ระบบบริหารจัดการและแจ้งเตือนพัสดุหอพัก (All-in-One)</title>
+  <title>ระบบบริหารจัดการและแจ้งเตือนพัสดุหอพัก (All-in-One Cloud Sync)</title>
 
   <!-- PWA & Mobile Configuration -->
   <meta name="theme-color" content="#4338CA">
@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2830/2830305.png">
   <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22%E0%B8%A3%E0%B8%B0%E0%B8%9A%E0%B8%9A%E0%B8%9E%E0%B8%B1%E0%B8%AA%E0%B8%94%E0%B8%B8%E0%B8%AB%E0%B8%AD%E0%B8%9E%E0%B8%B1%E0%B8%81%22%2C%22short_name%22%3A%22%E0%B8%9E%E0%B8%B1%E0%B8%AA%E0%B8%94%E0%B8%B8%E0%B8%AB%E0%B8%AD%E0%B8%9E%E0%B8%B1%E0%B8%81%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23F1F5F9%22%2C%22theme_color%22%3A%22%234338CA%22%7D">
 
-  <!-- Tailwind CSS & Icons -->
+  <!-- Tailwind CSS & FontAwesome -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -42,21 +42,21 @@
             <h1 class="font-bold text-sm md:text-base leading-tight" id="headerDormName">หอพัก KP House</h1>
             <span class="bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 text-[10px] px-1.5 py-0.2 rounded font-medium">Free</span>
           </div>
-          <p class="text-[11px] text-indigo-200 truncate">ระบบจัดการพัสดุ & ส่งแจ้งเตือน LINE</p>
+          <p class="text-[11px] text-indigo-200 truncate">ซิงค์ข้ามเครื่อง & ถ่ายต่อเนื่อง & แชร์ LINE</p>
         </div>
       </div>
 
       <!-- Navigation Tabs -->
       <div class="flex items-center gap-1 text-xs md:text-sm">
         <button id="tabScanBtn" onclick="switchMainTab('scan')" class="px-3 py-1.5 rounded-lg font-medium bg-white text-indigo-800 shadow-sm transition">
-          <i class="fa-solid fa-camera mr-1"></i> สแกนรับของ
+          <i class="fa-solid fa-camera mr-1"></i> สแกน
         </button>
         <button id="tabInventoryBtn" onclick="switchMainTab('inventory')" class="px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition">
           <i class="fa-solid fa-box-archive mr-1"></i> คลัง & ตกค้าง
           <span id="navOverdueBadge" class="ml-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] hidden font-bold">0</span>
         </button>
         <button id="tabMonthlyBtn" onclick="switchMainTab('monthly')" class="px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition">
-          <i class="fa-solid fa-chart-line mr-1"></i> สถิติรายเดือน
+          <i class="fa-solid fa-chart-line mr-1"></i> สถิติ
         </button>
         <button id="tabSettingsBtn" onclick="switchMainTab('settings')" class="px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition">
           <i class="fa-solid fa-hotel mr-1"></i> หอพัก
@@ -83,7 +83,7 @@
           <input type="file" id="albumInput" multiple accept="image/*" class="hidden">
           <button type="button" onclick="document.getElementById('albumInput').click()" 
             class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 transition">
-            <i class="fa-regular fa-images mr-1"></i> เลือกรูปหลายภาพจากอัลบั้ม
+            <i class="fa-regular fa-images mr-1"></i> เลือกรูปจากอัลบั้ม
           </button>
           <button type="button" onclick="loadDemoDataset()" 
             class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-3.5 py-2.5 rounded-xl text-xs font-semibold border border-amber-300 transition">
@@ -91,7 +91,7 @@
           </button>
         </div>
 
-        <!-- ถาดพรีวิวรูปภาพที่ถ่าย/เลือกไว้ -->
+        <!-- พรีวิวรูปภาพ -->
         <div id="previewArea" class="hidden text-left pt-3 border-t border-slate-100 space-y-2">
           <div class="flex justify-between items-center">
             <span id="previewCountLabel" class="text-xs font-bold text-slate-700">ถ่าย/เลือกแล้ว 0 ภาพ</span>
@@ -105,7 +105,7 @@
           </button>
         </div>
 
-        <!-- แถบแสดงความคืบหน้าการอ่าน -->
+        <!-- แถบแสดงความคืบหน้า -->
         <div id="scanLoaderBox" class="hidden space-y-1.5 pt-2">
           <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
             <div id="scanProgressBar" class="bg-indigo-600 h-2.5 w-0 transition-all duration-300"></div>
@@ -172,7 +172,7 @@
 
     </div>
 
-    <!-- ================= TAB 2: คลังพัสดุ & ตรวจจับของค้าง (Feature 1) ================= -->
+    <!-- ================= TAB 2: คลังพัสดุ & ตรวจจับของค้าง (พร้อมปุ่มซิงค์คลาวด์) ================= -->
     <div id="viewInventory" class="hidden space-y-5">
       
       <div class="bg-gradient-to-r from-rose-500 to-amber-500 text-white p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -183,9 +183,14 @@
           <h2 class="text-lg font-bold mt-1">คลังพัสดุตกค้างรอรับ</h2>
           <p class="text-xs text-white/90">แสดงพัสดุที่ยังไม่มีผู้มารับ พร้อมระบบแจ้งเตือนสีส้ม (3 วัน) และสีแดง (7 วัน)</p>
         </div>
-        <button onclick="generateOverdueLineMessage()" class="bg-white text-rose-600 hover:bg-rose-50 px-3.5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition whitespace-nowrap">
-          <i class="fa-brands fa-line mr-1 text-base text-emerald-500"></i> สร้างประกาศทวงของค้าง LINE
-        </button>
+        <div class="flex gap-2">
+          <button onclick="syncDataFromCloud(true)" class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-xl font-bold text-xs shadow-sm transition whitespace-nowrap">
+            <i class="fa-solid fa-rotate mr-1"></i> ซิงค์ชีต
+          </button>
+          <button onclick="generateOverdueLineMessage()" class="bg-white text-rose-600 hover:bg-rose-50 px-3.5 py-2 rounded-xl font-bold text-xs shadow-sm transition whitespace-nowrap">
+            <i class="fa-brands fa-line mr-1 text-base text-emerald-500"></i> ทวงของค้าง LINE
+          </button>
+        </div>
       </div>
 
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -303,8 +308,7 @@
 
         <div class="pt-2 border-t border-slate-100">
           <label class="block font-semibold text-slate-700 mb-1 flex justify-between items-center">
-            <span><i class="fa-solid fa-table-cells text-emerald-600 mr-1"></i> Google Apps Script Web App URL (ซิงค์ Sheets ฟรี):</span>
-            <button onclick="toggleScriptHelpModal()" class="text-[11px] text-emerald-600 hover:underline">ดูโค้ดสคริปต์ &rarr;</button>
+            <span><i class="fa-solid fa-table-cells text-emerald-600 mr-1"></i> Google Apps Script Web App URL (ซิงค์ Sheets ข้ามเครื่อง):</span>
           </label>
           <input type="text" id="settingGasUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
         </div>
@@ -389,39 +393,11 @@
     </div>
   </div>
 
-  <!-- Modal โค้ด Google Apps Script -->
-  <div id="gasHelpModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white max-w-lg w-full rounded-2xl p-5 shadow-2xl space-y-3.5 max-h-[85vh] overflow-y-auto text-xs">
-      <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-          <i class="fa-brands fa-google text-emerald-600"></i> โค้ด Google Apps Script เชื่อม Google Sheets
-        </h3>
-        <button onclick="toggleScriptHelpModal()" class="text-slate-400 text-lg">&times;</button>
-      </div>
-      <p class="text-slate-600">นำโค้ดด้านล่างไปวางใน Extensions &gt; Apps Script ของ Google Sheets แล้ว Deploy เป็น Web App (เลือกสิทธิ์เป็น Anyone):</p>
-      <pre class="bg-slate-900 text-emerald-400 p-3 rounded-xl overflow-x-auto text-[11px] font-mono select-all">
-function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var data = JSON.parse(e.postData.contents);
-  if (data.action === "save_batch") {
-    data.items.forEach(function(item) {
-      sheet.appendRow([item.id, item.dormName, item.target, item.courier, item.cod, item.date, item.status]);
-    });
-    return ContentService.createTextOutput(JSON.stringify({status: "success"})).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-      </pre>
-      <div class="text-right">
-        <button onclick="toggleScriptHelpModal()" class="bg-slate-800 text-white px-4 py-1.5 rounded-xl font-semibold">ปิดหน้าต่าง</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ================= JAVASCRIPT ENGINE ================= -->
   <script>
     // State
-    const STORAGE_KEY_TENANTS = 'smart_parcel_all_tenants_v2';
-    const STORAGE_KEY_ACTIVE_ID = 'smart_parcel_active_id_v2';
+    const STORAGE_KEY_TENANTS = 'smart_parcel_all_tenants_v3';
+    const STORAGE_KEY_ACTIVE_ID = 'smart_parcel_active_id_v3';
 
     let tenants = [];
     let activeTenant = null;
@@ -435,9 +411,14 @@ function doPost(e) {
       setupInputsListeners();
       switchMainTab('scan');
       document.getElementById('statsMonthPicker').value = new Date().toISOString().slice(0, 7);
+      
+      // ดึงข้อมูลล่าสุดจากชีตอัตโนมัติเมื่อเปิดแอป
+      if (activeTenant && activeTenant.gasUrl) {
+        syncDataFromCloud(false);
+      }
     });
 
-    // ================= 1. DORM MANAGEMENT (MULTI-TENANT) =================
+    // ================= 1. DORM MANAGEMENT & STORAGE =================
     function initTenantsSystem() {
       const raw = localStorage.getItem(STORAGE_KEY_TENANTS);
       if (raw) {
@@ -508,6 +489,7 @@ function doPost(e) {
       localStorage.setItem(STORAGE_KEY_ACTIVE_ID, found.id);
       updateDormUI();
       switchMainTab('scan');
+      if (activeTenant.gasUrl) syncDataFromCloud(false);
     }
 
     function promptAddNewDorm() {
@@ -545,6 +527,7 @@ function doPost(e) {
       saveTenantsToStorage();
       updateDormUI();
       alert('บันทึกการตั้งค่าเรียบร้อย!');
+      if (activeTenant.gasUrl) syncDataFromCloud(true);
     }
 
     // ================= 2. NAVIGATION =================
@@ -562,12 +545,11 @@ function doPost(e) {
         }
       });
 
-      if (tab === 'inventory') renderInventoryTable();
+      if (tab === 'inventory') {
+        renderInventoryTable();
+        if (activeTenant && activeTenant.gasUrl) syncDataFromCloud(false);
+      }
       if (tab === 'monthly') renderMonthlyStats();
-    }
-
-    function toggleScriptHelpModal() {
-      document.getElementById('gasHelpModal').classList.toggle('hidden');
     }
 
     // ================= 3. CONTINUOUS CAMERA & ALBUM =================
@@ -735,7 +717,7 @@ function doPost(e) {
           const res = await callGeminiVisionApi(b64, apiKey);
           if (res) currentScannedRows.push(res);
         } catch (err) {
-          console.error(err);
+          console.error("AI Error:", err);
         }
       }
 
@@ -747,7 +729,7 @@ function doPost(e) {
     }
 
     async function callGeminiVisionApi(base64, apiKey) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       const payload = {
         contents: [{
           parts: [
@@ -874,7 +856,7 @@ function doPost(e) {
       navigator.clipboard.writeText(msg).then(() => alert('คัดลอกข้อความสำเร็จ!'));
     }
 
-    // ================= 6. INVENTORY, OVERDUE & CLOUD =================
+    // ================= 6. CLOUD SYNC & INVENTORY =================
     async function saveBatchToInventoryAndCloud() {
       if (!currentScannedRows.length || !activeTenant) return;
       const today = new Date().toISOString().split('T')[0];
@@ -906,9 +888,33 @@ function doPost(e) {
         }
       }
 
-      alert(`บันทึกพัสดุ ${newItems.length} ชิ้น เข้าคลังหอพักสำเร็จ!`);
+      alert(`บันทึกพัสดุ ${newItems.length} ชิ้น เข้าคลังสำเร็จ!`);
       renderInventoryTable();
       renderMonthlyStats();
+    }
+
+    // ฟังก์ชันซิงค์ข้อมูลจาก Google Sheets ลงมาแสดงในเครื่องนี้ (Two-way Sync)
+    async function syncDataFromCloud(showAlert = false) {
+      if (!activeTenant || !activeTenant.gasUrl) {
+        if (showAlert) alert('กรุณาระบุ Google Apps Script Web App URL ในแท็บหอพักก่อน');
+        return;
+      }
+
+      try {
+        const res = await fetch(activeTenant.gasUrl);
+        const json = await res.json();
+        
+        if (json.status === "success" && json.data) {
+          activeTenant.records = json.data;
+          saveTenantsToStorage();
+          renderInventoryTable();
+          renderMonthlyStats();
+          if (showAlert) alert('ซิงค์ข้อมูลล่าสุดจาก Google Sheets เรียบร้อยแล้ว!');
+        }
+      } catch (err) {
+        console.error("Cloud Fetch Error:", err);
+        if (showAlert) alert('ไม่สามารถเชื่อมต่อ Google Sheets ได้ ตรวจสอบ URL อีกครั้ง');
+      }
     }
 
     function renderInventoryTable() {
@@ -970,7 +976,7 @@ function doPost(e) {
       }
     }
 
-    function markItemAsReceived(id) {
+    async function markItemAsReceived(id) {
       if (!activeTenant) return;
       const rec = activeTenant.records.find(r => r.id === id);
       if (rec) {
@@ -978,6 +984,20 @@ function doPost(e) {
         saveTenantsToStorage();
         renderInventoryTable();
         renderMonthlyStats();
+      }
+
+      // ส่งคำสั่งไปอัปเดตบน Google Sheets ด้วย
+      if (activeTenant.gasUrl) {
+        try {
+          fetch(activeTenant.gasUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: "mark_received", id: id })
+          });
+        } catch (e) {
+          console.error("Cloud Mark Received Err", e);
+        }
       }
     }
 
