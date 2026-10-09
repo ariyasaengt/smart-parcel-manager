@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ระบบพัสดุหอพัก (Multi-Dorm Cloud Auth)</title>
+  <title>ระบบพัสดุหอพัก All-in-One Cloud Management</title>
 
   <!-- PWA Settings -->
   <meta name="theme-color" content="#4338CA">
@@ -16,6 +16,12 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
     * { font-family: 'Prompt', sans-serif; -webkit-tap-highlight-color: transparent; }
+    .badge-flash { background-color: #FEF08A; color: #854D0E; border: 1px solid #FACC15; }
+    .badge-spx { background-color: #FFEDD5; color: #9A3412; border: 1px solid #FB923C; }
+    .badge-jnt { background-color: #FEE2E2; color: #991B1B; border: 1px solid #F87171; }
+    .badge-kex { background-color: #FFEDD5; color: #C2410C; border: 1px solid #F97316; }
+    .badge-ems { background-color: #EFF6FF; color: #1E40AF; border: 1px solid #60A5FA; }
+    .badge-other { background-color: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; }
     .shutter-flash { animation: flashAnim 0.15s ease-out; }
     @keyframes flashAnim { 0% { opacity: 0.8; } 100% { opacity: 0; } }
   </style>
@@ -30,10 +36,9 @@
           <i class="fa-solid fa-boxes-packing"></i>
         </div>
         <h2 class="text-xl font-bold text-slate-800">ระบบจัดการพัสดุหอพัก</h2>
-        <p class="text-xs text-slate-500">ล็อกอินครั้งเดียว ใช้งานได้ตลอดโดยไม่ต้องใส่ API Key</p>
+        <p class="text-xs text-slate-500">ข้อมูลเชื่อมต่อ Cloud Sheets ปลอดภัย อัปเดตระบบข้อมูลไม่หาย</p>
       </div>
 
-      <!-- สลับแท็บ เข้าสู่ระบบ / ลงทะเบียนหอใหม่ -->
       <div class="flex border-b border-slate-200 text-xs font-semibold">
         <button id="tabLoginBtn" onclick="switchAuthTab('login')" class="flex-1 py-2.5 border-b-2 border-indigo-600 text-indigo-600">เข้าสู่ระบบ</button>
         <button id="tabRegBtn" onclick="switchAuthTab('register')" class="flex-1 py-2.5 text-slate-400 hover:text-slate-600">ลงทะเบียนหอพักใหม่</button>
@@ -97,8 +102,12 @@
 
         <div class="flex items-center gap-1 text-xs md:text-sm">
           <button id="navScan" onclick="switchTab('scan')" class="px-3 py-1.5 rounded-lg font-medium bg-white text-indigo-800 shadow-sm transition">สแกน</button>
-          <button id="navInv" onclick="switchTab('inv')" class="px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition">คลัง & ตกค้าง</button>
-          <button id="navStaff" onclick="switchTab('staff')" class="px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition">ทีมงาน</button>
+          <button id="navInv" onclick="switchTab('inv')" class="px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition">
+            คลัง & ตกค้าง
+            <span id="navOverdueBadge" class="ml-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] hidden font-bold">0</span>
+          </button>
+          <button id="navStats" onclick="switchTab('stats')" class="px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition">สถิติ</button>
+          <button id="navStaff" onclick="switchTab('staff')" class="px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition">ตั้งค่า & ทีมงาน</button>
           <button onclick="handleLogout()" class="px-2.5 py-1.5 rounded-lg font-medium text-rose-200 hover:bg-rose-600 transition"><i class="fa-solid fa-right-from-bracket"></i></button>
         </div>
       </div>
@@ -127,7 +136,7 @@
           <div id="previewArea" class="hidden text-left pt-3 border-t space-y-2">
             <div class="flex justify-between items-center text-xs">
               <span id="previewCountLabel" class="font-bold text-slate-700">0 ภาพ</span>
-              <button onclick="clearCaptured()" class="text-rose-500">ล้างรูป</button>
+              <button onclick="clearCaptured()" class="text-rose-500 hover:underline">ล้างทั้งหมด</button>
             </div>
             <div id="thumbnailsGrid" class="grid grid-cols-5 sm:grid-cols-8 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-slate-50 rounded-xl border"></div>
             <button id="runAiScanBtn" onclick="processImagesWithCloudAi()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm shadow">
@@ -146,47 +155,177 @@
         <!-- รายการตรวจสอบ -->
         <div id="inspectionSection" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hidden space-y-3">
           <div class="flex justify-between items-center border-b pb-2">
-            <h3 class="text-xs md:text-sm font-bold text-slate-800">ตรวจสอบข้อมูลพัสดุที่อ่านได้</h3>
-            <button onclick="saveBatchToCloudSheet()" class="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow">
-              บันทึกเข้าคลังหอพัก & ซิงค์ชีต
-            </button>
+            <div>
+              <h3 class="text-xs md:text-sm font-bold text-slate-800">ตรวจสอบข้อมูลพัสดุที่อ่านได้</h3>
+              <p class="text-[10px] text-slate-400">ป้ายขนส่งและ COD แสดงเฉพาะในระบบแอดมิน</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="addNewManualRow()" class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">+ เพิ่มเอง</button>
+              <button onclick="saveBatchToCloudSheet()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow">
+                <i class="fa-solid fa-cloud-arrow-up mr-1"></i> บันทึกเข้าคลัง & ซิงค์ชีต
+              </button>
+            </div>
           </div>
-          <div id="inspectionList" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
+          <div class="overflow-x-auto max-h-60">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 uppercase border-b border-slate-200 sticky top-0 text-[11px]">
+                <tr>
+                  <th class="py-2 px-3">ห้อง / ผู้รับ</th>
+                  <th class="py-2 px-3 text-center">ขนส่ง</th>
+                  <th class="py-2 px-3 text-center">COD</th>
+                  <th class="py-2 px-3 text-right">ลบ</th>
+                </tr>
+              </thead>
+              <tbody id="inspectionTbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
         </div>
 
         <!-- ข้อความส่ง LINE -->
         <div id="outputSection" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hidden space-y-3">
           <div class="flex justify-between items-center">
-            <h3 class="text-xs md:text-sm font-bold text-slate-800">ข้อความพร้อมส่งใน LINE (รวมชิ้น)</h3>
+            <h3 class="text-xs md:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <i class="fa-brands fa-line text-emerald-500 text-lg"></i> ข้อความพร้อมส่งใน LINE
+            </h3>
             <span id="outputBadgeCount" class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">0 ชิ้น</span>
           </div>
           <textarea id="finalLineTemplate" rows="10" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs md:text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed"></textarea>
-          <button onclick="shareDirectToLine()" class="w-full bg-[#06C755] active:bg-[#05a346] text-white py-3.5 px-4 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2">
+          <button onclick="shareDirectToLine()" class="w-full bg-[#06C755] active:bg-[#05a346] text-white py-3.5 px-4 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition active:scale-[0.98]">
             <i class="fa-brands fa-line text-2xl"></i>
             <span>เปิดแอป LINE ทันที (เลือกกลุ่มส่ง)</span>
           </button>
-        </div>
-      </div>
-
-      <!-- TAB 2: คลังพัสดุ & ของค้าง -->
-      <div id="viewInv" class="hidden space-y-4">
-        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
-          <div>
-            <h3 class="font-bold text-slate-800 text-sm">พัสดุค้างรับประจำหอพัก</h3>
-            <p class="text-xs text-slate-400">อัปเดตสถานะและซิงค์กับแท็บชีตของหอพักนี้ทันที</p>
-          </div>
-          <button onclick="fetchDormInventory(true)" class="bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-200">
-            <i class="fa-solid fa-rotate mr-1"></i> รีเฟรชข้อมูล
+          <button onclick="copyTemplateToClipboard()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-semibold transition">
+            <i class="fa-regular fa-copy mr-1"></i> คัดลอกข้อความ
           </button>
         </div>
+      </div>
+
+      <!-- TAB 2: คลังพัสดุ & ของค้าง (OVERDUE SYSTEM) -->
+      <div id="viewInv" class="hidden space-y-5">
+        <div class="bg-gradient-to-r from-rose-500 to-amber-500 text-white p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <span class="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+              <i class="fa-solid fa-clock-rotate-left mr-1"></i> Overdue Tracking
+            </span>
+            <h2 class="text-lg font-bold mt-1">คลังพัสดุตกค้างรอรับ</h2>
+            <p class="text-xs text-white/90">แสดงพัสดุที่ยังไม่มีผู้มารับ แจ้งเตือนสีส้ม (3 วัน) และสีแดง (7 วัน)</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="fetchDormInventory(true)" class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-xl font-bold text-xs shadow-sm transition whitespace-nowrap">
+              <i class="fa-solid fa-rotate mr-1"></i> ซิงค์ชีต
+            </button>
+            <button onclick="generateOverdueLineMessage()" class="bg-white text-rose-600 hover:bg-rose-50 px-3.5 py-2 rounded-xl font-bold text-xs shadow-sm transition whitespace-nowrap">
+              <i class="fa-brands fa-line mr-1 text-base text-emerald-500"></i> ทวงของค้าง LINE
+            </button>
+          </div>
+        </div>
+
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div id="inventoryContainer" class="divide-y divide-slate-100"></div>
+          <div class="p-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center gap-2">
+              <h3 class="font-bold text-slate-800 text-xs md:text-sm">รายการพัสดุในคลัง</h3>
+              <span id="inventoryCountBadge" class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold">0 ชิ้น</span>
+            </div>
+            <input type="text" id="searchInventoryInput" placeholder="ค้นหาห้อง / ผู้รับ..." 
+              class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs md:text-sm">
+              <thead class="bg-slate-50 text-slate-500 uppercase border-b border-slate-200 text-[11px]">
+                <tr>
+                  <th class="py-2.5 px-3">ห้อง / ผู้รับ</th>
+                  <th class="py-2.5 px-3 text-center">วันที่เข้า</th>
+                  <th class="py-2.5 px-3 text-center">ระยะเวลา</th>
+                  <th class="py-2.5 px-3 text-center">ขนส่ง / COD</th>
+                  <th class="py-2.5 px-3 text-right">ดำเนินการ</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <!-- TAB 3: จัดการทีมงาน -->
-      <div id="viewStaff" class="hidden space-y-4">
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+      <!-- TAB 3: สถิติรายเดือน & โหลดชีตลงเครื่อง (MONTHLY STATS & EXCEL CSV) -->
+      <div id="viewStats" class="hidden space-y-5">
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-3">
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-semibold text-slate-600">เลือกเดือน:</label>
+            <input type="month" id="statsMonthPicker" class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <input type="text" id="statsSearchRoomInput" placeholder="กรองห้อง/ชื่อ..." class="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none flex-1 sm:w-48">
+            <button onclick="exportMonthlyCsv()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow transition whitespace-nowrap">
+              <i class="fa-solid fa-file-excel mr-1"></i> โหลดชีตลงเครื่อง (Excel)
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <p class="text-[11px] text-slate-400">พัสดุทั้งหมดเดือนนี้</p>
+            <h3 id="statTotalMonth" class="text-xl md:text-2xl font-bold text-indigo-600 mt-0.5">0 ชิ้น</h3>
+          </div>
+          <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <p class="text-[11px] text-slate-400">ห้อง/ผู้รับที่มีพัสดุ</p>
+            <h3 id="statRecipientsMonth" class="text-xl md:text-2xl font-bold text-slate-700 mt-0.5">0 ราย</h3>
+          </div>
+          <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 col-span-2 sm:col-span-1">
+            <p class="text-[11px] text-slate-400">พัสดุเฉลี่ยต่อห้อง</p>
+            <h3 id="statAvgMonth" class="text-xl md:text-2xl font-bold text-emerald-600 mt-0.5">0 ชิ้น</h3>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="p-3.5 border-b border-slate-100 flex justify-between items-center">
+            <h3 class="font-bold text-slate-800 text-xs md:text-sm">ยอดสะสมรายห้องประจำเดือน</h3>
+            <span id="monthlyRowCountBadge" class="text-xs text-slate-400">0 รายการ</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs md:text-sm">
+              <thead class="bg-slate-50 text-slate-500 uppercase border-b border-slate-200 text-[11px]">
+                <tr>
+                  <th class="py-2.5 px-4">ห้อง / ผู้รับ</th>
+                  <th class="py-2.5 px-4 text-center">พัสดุสะสม</th>
+                  <th class="py-2.5 px-4 text-right">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="monthlySummaryTbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: ตั้งค่าเทมเพลต LINE & ทีมงาน -->
+      <div id="viewStaff" class="hidden space-y-5">
+        <!-- ปรับแต่งเทมเพลต LINE -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3.5 text-xs md:text-sm">
+          <div class="border-b border-slate-100 pb-2.5">
+            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+              <i class="fa-brands fa-line text-emerald-500 text-base"></i> ปรับแต่งเทมเพลตข้อความ LINE
+            </h3>
+            <p class="text-slate-400 text-xs">บันทึกตรงเข้า Google Sheets อัปเดตข้ามเครื่องและจำถาวร</p>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">ข้อความเปิดหัวประกาศ (Header):</label>
+              <input type="text" id="tplHeaderInput" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">ข้อความปิดท้ายประกาศ (Footer):</label>
+              <textarea id="tplFooterInput" rows="2" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+            </div>
+            <div class="text-right">
+              <button onclick="saveLineTemplates()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2 rounded-xl shadow transition">
+                <i class="fa-solid fa-floppy-disk mr-1"></i> บันทึกเทมเพลตลงฐานข้อมูล
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- จัดการทีมงาน (เฉพาะ Owner) -->
+        <div id="staffManagementBox" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
           <h3 class="font-bold text-slate-800 text-sm">เพิ่มบัญชีผู้ดูแล/แอดมินร่วม</h3>
           <p class="text-xs text-slate-400">ให้ผู้ดูแลคนอื่นล็อกอินเข้ามาช่วยจัดการพัสดุในหอพักนี้ได้</p>
           <form onsubmit="handleAddStaff(event)" class="space-y-3 text-xs">
@@ -232,17 +371,14 @@
   </div>
 
   <script>
-    // ==============================================================
-    // ใส่ URL ตัวใหม่ล่าสุดของคุณเรียบร้อยแล้ว
-    // ==============================================================
     const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyfF8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec";
 
     let currentUser = null;
+    let currentDormRecords = [];
     let capturedBase64List = [];
     let currentScannedRows = [];
     let mediaStream = null;
 
-    // ฟังก์ชันส่ง Request ไปยัง Apps Script รองรับ Redirect และ Text/Plain เพื่อเลี่ยงปัญหา CORS
     async function callGasBackend(payload) {
       try {
         const response = await fetch(GAS_ENDPOINT_URL, {
@@ -259,11 +395,18 @@
       }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       const savedUser = localStorage.getItem('dorm_auth_user');
       if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        initMainApp();
+        try {
+          currentUser = JSON.parse(savedUser);
+          // Re-verify กับ Cloud เสมอเพื่อดึงข้อมูลล่าสุด & ป้องกันข้อมูลค้างเก่า
+          initMainApp();
+          verifySessionWithCloud();
+        } catch (e) {
+          localStorage.removeItem('dorm_auth_user');
+          document.getElementById('authScreen').classList.remove('hidden');
+        }
       } else {
         document.getElementById('authScreen').classList.remove('hidden');
       }
@@ -276,7 +419,30 @@
           renderThumbnails();
         }
       });
+
+      document.getElementById('searchInventoryInput').addEventListener('input', renderInventoryTable);
+      document.getElementById('statsMonthPicker').value = new Date().toISOString().slice(0, 7);
+      document.getElementById('statsMonthPicker').addEventListener('change', renderMonthlyStats);
+      document.getElementById('statsSearchRoomInput').addEventListener('input', renderMonthlyStats);
     });
+
+    async function verifySessionWithCloud() {
+      if (!currentUser) return;
+      try {
+        const json = await callGasBackend({ 
+          action: "verify_session", 
+          username: currentUser.username, 
+          dormId: currentUser.dormId 
+        });
+        if (json.status === "success" && json.user) {
+          currentUser = json.user;
+          localStorage.setItem('dorm_auth_user', JSON.stringify(currentUser));
+          applyUserSettingsToUI();
+        }
+      } catch (e) {
+        console.warn("Could not re-verify session with cloud:", e);
+      }
+    }
 
     function switchAuthTab(tab) {
       document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
@@ -372,24 +538,39 @@
     function initMainApp() {
       document.getElementById('authScreen').classList.add('hidden');
       document.getElementById('mainAppScreen').classList.remove('hidden');
+      applyUserSettingsToUI();
+      fetchDormInventory(false);
+    }
+
+    function applyUserSettingsToUI() {
+      if (!currentUser) return;
       document.getElementById('appDormTitle').innerText = currentUser.dormName;
       document.getElementById('appUsername').innerText = currentUser.username;
       document.getElementById('roleBadge').innerText = currentUser.role === 'owner' ? 'เจ้าของหอ' : 'ผู้ดูแล';
       
       if (currentUser.role !== 'owner') {
-        document.getElementById('navStaff').classList.add('hidden');
+        document.getElementById('staffManagementBox').classList.add('hidden');
+      } else {
+        document.getElementById('staffManagementBox').classList.remove('hidden');
       }
-      fetchDormInventory(false);
+
+      document.getElementById('tplHeaderInput').value = currentUser.tplHeader || '📦 แจ้งเตือนพัสดุเข้าใหม่!';
+      document.getElementById('tplFooterInput').value = currentUser.tplFooter || '📍 ติดต่อรับพัสดุได้ที่ออฟฟิศ ชั้น 1 ได้ถึงเวลา 21.30 น.';
     }
 
     function switchTab(t) {
-      document.getElementById('viewScan').classList.toggle('hidden', t !== 'scan');
-      document.getElementById('viewInv').classList.toggle('hidden', t !== 'inv');
-      document.getElementById('viewStaff').classList.toggle('hidden', t !== 'staff');
-      document.getElementById('navScan').className = t === 'scan' ? 'px-3 py-1.5 rounded-lg font-medium bg-white text-indigo-800 shadow-sm transition' : 'px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition';
-      document.getElementById('navInv').className = t === 'inv' ? 'px-3 py-1.5 rounded-lg font-medium bg-white text-indigo-800 shadow-sm transition' : 'px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition';
-      document.getElementById('navStaff').className = t === 'staff' ? 'px-3 py-1.5 rounded-lg font-medium bg-white text-indigo-800 shadow-sm transition' : 'px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition';
-      if (t === 'inv') fetchDormInventory(false);
+      const views = { scan: 'viewScan', inv: 'viewInv', stats: 'viewStats', staff: 'viewStaff' };
+      const navs = { scan: 'navScan', inv: 'navInv', stats: 'navStats', staff: 'navStaff' };
+
+      Object.keys(views).forEach(k => {
+        document.getElementById(views[k]).classList.toggle('hidden', k !== t);
+        document.getElementById(navs[k]).className = k === t 
+          ? 'px-3 py-1.5 rounded-lg font-medium bg-white text-indigo-800 shadow-sm transition' 
+          : 'px-3 py-1.5 rounded-lg font-medium text-indigo-100 hover:bg-indigo-600 transition';
+      });
+
+      if (t === 'inv') renderInventoryTable();
+      if (t === 'stats') renderMonthlyStats();
     }
 
     // กล้องถ่ายต่อเนื่อง
@@ -442,7 +623,7 @@
       renderThumbnails();
     }
 
-    // สแกนภาพด้วย AI
+    // ประมวลผล AI
     async function processImagesWithCloudAi() {
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
@@ -466,7 +647,7 @@
       }
 
       loader.classList.add('hidden');
-      renderInspection();
+      renderInspectionTable();
       generateLineTemplate();
     }
 
@@ -484,31 +665,58 @@
         { target: "ศศิณา", courier: "SPX", cod: "None" },
         { target: "ศศิณา", courier: "SPX", cod: "None" }
       ];
-      renderInspection();
+      renderInspectionTable();
       generateLineTemplate();
     }
 
-    function renderInspection() {
-      document.getElementById('inspectionSection').classList.remove('hidden');
-      const list = document.getElementById('inspectionList');
-      list.innerHTML = '';
-      currentScannedRows.forEach(item => {
-        list.innerHTML += `
-          <div class="flex justify-between items-center p-2 bg-slate-50 rounded-lg text-xs border">
-            <span class="font-bold">${item.target}</span>
-            <div>
-              <span class="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded mr-1">${item.courier}</span>
-              ${item.cod !== 'None' ? `<span class="text-[10px] text-rose-600 font-bold">COD ${item.cod}</span>` : ''}
-            </div>
-          </div>
+    function renderInspectionTable() {
+      const sec = document.getElementById('inspectionSection');
+      const tbody = document.getElementById('inspectionTbody');
+      if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
+      
+      sec.classList.remove('hidden');
+      tbody.innerHTML = '';
+
+      currentScannedRows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-1.5 px-3">
+            <input type="text" value="${row.target}" onchange="currentScannedRows[${idx}].target=this.value; generateLineTemplate()" 
+              class="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-bold text-slate-700">
+          </td>
+          <td class="py-1.5 px-3 text-center">
+            <select onchange="currentScannedRows[${idx}].courier=this.value" class="bg-slate-50 border border-slate-200 rounded px-1.5 py-1 text-xs">
+              ${['SPX','Flash','J&T','KEX','EMS','Other'].map(c => `<option value="${c}" ${row.courier===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </td>
+          <td class="py-1.5 px-3 text-center">
+            <input type="text" value="${row.cod}" onchange="currentScannedRows[${idx}].cod=this.value" 
+              class="w-20 text-center bg-slate-50 border border-slate-200 rounded px-1 py-1 text-xs ${row.cod!=='None'?'font-bold text-rose-600':'text-slate-400'}">
+          </td>
+          <td class="py-1.5 px-3 text-right">
+            <button onclick="currentScannedRows.splice(${idx},1); renderInspectionTable(); generateLineTemplate()" class="text-rose-400 hover:text-rose-600">&times;</button>
+          </td>
         `;
+        tbody.appendChild(tr);
       });
     }
 
+    function addNewManualRow() {
+      currentScannedRows.push({ target: "ห้อง...", courier: "Other", cod: "None" });
+      renderInspectionTable();
+      generateLineTemplate();
+    }
+
     function generateLineTemplate() {
-      document.getElementById('outputSection').classList.remove('hidden');
+      const sec = document.getElementById('outputSection');
+      if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
+      sec.classList.remove('hidden');
+
       const counts = {};
-      currentScannedRows.forEach(i => counts[i.target] = (counts[i.target] || 0) + 1);
+      currentScannedRows.forEach(i => {
+        const k = i.target.trim();
+        if (k) counts[k] = (counts[k] || 0) + 1;
+      });
 
       const keys = Object.keys(counts).sort((a, b) => {
         const na = parseInt(a, 10), nb = parseInt(b, 10);
@@ -518,8 +726,11 @@
         return a.localeCompare(b, 'th');
       });
 
+      const header = (currentUser && currentUser.tplHeader) ? currentUser.tplHeader : '📦 แจ้งเตือนพัสดุเข้าใหม่!';
+      const footer = (currentUser && currentUser.tplFooter) ? currentUser.tplFooter : '📍 ติดต่อรับพัสดุได้ที่ออฟฟิศ ชั้น 1 ได้ถึงเวลา 21.30 น.';
+
       const lines = [
-        '📦 แจ้งเตือนพัสดุเข้าใหม่!',
+        header,
         `(รวม ${currentScannedRows.length} ชิ้น)`
       ];
 
@@ -528,10 +739,34 @@
         lines.push(c > 1 ? `ห้อง/ผู้รับ: ${k} ( ${c} ชิ้น )` : `ห้อง/ผู้รับ: ${k}`);
       });
 
-      lines.push('');
-      lines.push('📍 ติดต่อรับพัสดุได้ที่ออฟฟิศ ชั้น 1 ได้ถึงเวลา 21.30 น.');
+      if (footer) {
+        lines.push('');
+        lines.push(footer);
+      }
+
       document.getElementById('finalLineTemplate').value = lines.join('\n');
       document.getElementById('outputBadgeCount').innerText = `${currentScannedRows.length} ชิ้น`;
+    }
+
+    async function saveLineTemplates() {
+      const h = document.getElementById('tplHeaderInput').value.trim();
+      const f = document.getElementById('tplFooterInput').value.trim();
+
+      if (!currentUser) return;
+      currentUser.tplHeader = h;
+      currentUser.tplFooter = f;
+      localStorage.setItem('dorm_auth_user', JSON.stringify(currentUser));
+
+      await callGasBackend({
+        action: "save_dorm_settings",
+        dormId: currentUser.dormId,
+        dormName: currentUser.dormName,
+        tplHeader: h,
+        tplFooter: f
+      });
+
+      alert('บันทึกการตั้งค่าเทมเพลตลงฐานข้อมูลถาวรเรียบร้อย!');
+      generateLineTemplate();
     }
 
     function shareDirectToLine() {
@@ -539,6 +774,11 @@
       window.location.href = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
     }
 
+    function copyTemplateToClipboard() {
+      navigator.clipboard.writeText(document.getElementById('finalLineTemplate').value).then(() => alert('คัดลอกข้อความสำเร็จ!'));
+    }
+
+    // บันทึกเข้าคลังและชีต
     async function saveBatchToCloudSheet() {
       const today = new Date().toISOString().split('T')[0];
       const items = currentScannedRows.map(r => ({
@@ -553,42 +793,188 @@
 
       await callGasBackend({ action: "save_parcels", dormId: currentUser.dormId, items: items });
       alert('บันทึกพัสดุเข้าชีตของหอพักเรียบร้อย!');
+      fetchDormInventory(false);
+      switchTab('inv');
     }
 
+    // ดึงข้อมูลชีตของหอพักนี้
     async function fetchDormInventory(showAlert) {
       if (!currentUser) return;
       try {
         const res = await fetch(`${GAS_ENDPOINT_URL}?dormId=${encodeURIComponent(currentUser.dormId)}`);
         const json = await res.json();
-        const container = document.getElementById('inventoryContainer');
-        container.innerHTML = '';
-
-        const pending = (json.data || []).filter(i => i.status === 'pending');
-        if (pending.length === 0) {
-          container.innerHTML = '<p class="text-center text-slate-400 py-6 text-xs">ไม่มีพัสดุค้างรับในหอพักนี้</p>';
-          return;
-        }
-
-        pending.forEach(item => {
-          container.innerHTML += `
-            <div class="p-3 flex justify-between items-center text-xs">
-              <div>
-                <p class="font-bold text-slate-800">${item.target}</p>
-                <p class="text-[10px] text-slate-400">วันที่เข้า: ${item.date} (${item.courier})</p>
-              </div>
-              <button onclick="markReceived('${item.id}')" class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">รับแล้ว</button>
-            </div>
-          `;
-        });
-        if (showAlert) alert('อัปเดตข้อมูลล่าสุดแล้ว');
+        currentDormRecords = json.data || [];
+        renderInventoryTable();
+        renderMonthlyStats();
+        if (showAlert) alert('อัปเดตข้อมูลล่าสุดจากชีตแล้ว');
       } catch (e) {
         console.error(e);
       }
     }
 
+    // คลัง & ตกค้าง (OVERDUE SYSTEM)
+    function renderInventoryTable() {
+      const tbody = document.getElementById('inventoryTbody');
+      const badge = document.getElementById('inventoryCountBadge');
+      const navBadge = document.getElementById('navOverdueBadge');
+      const search = document.getElementById('searchInventoryInput').value.toLowerCase().trim();
+
+      const pending = currentDormRecords.filter(r => r.status === 'pending');
+      const filtered = pending.filter(r => r.target.toLowerCase().includes(search));
+
+      badge.textContent = `${pending.length} ชิ้น`;
+      const today = new Date();
+      let overdueCount = 0;
+
+      tbody.innerHTML = '';
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400">ไม่มีพัสดุค้างรับในหอพักนี้</td></tr>`;
+        navBadge.classList.add('hidden');
+        return;
+      }
+
+      filtered.forEach(item => {
+        const diff = Math.floor((today - new Date(item.date)) / (1000 * 60 * 60 * 24));
+        if (diff >= 3) overdueCount++;
+
+        let badgeHtml = `<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">เข้าใหม่ (${diff} วัน)</span>`;
+        if (diff >= 7) {
+          badgeHtml = `<span class="bg-rose-100 text-rose-800 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">ค้างวิกฤต (${diff} วัน)</span>`;
+        } else if (diff >= 3) {
+          badgeHtml = `<span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold">ค้างนาน (${diff} วัน)</span>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-bold text-slate-700">${item.target}</td>
+          <td class="py-2.5 px-3 text-center text-slate-500">${item.date}</td>
+          <td class="py-2.5 px-3 text-center">${badgeHtml}</td>
+          <td class="py-2.5 px-3 text-center">
+            <span class="badge-${item.courier.toLowerCase()} text-[10px] px-1.5 py-0.5 rounded font-bold">${item.courier}</span>
+            ${item.cod !== 'None' ? `<span class="text-[10px] bg-rose-50 text-rose-600 font-bold ml-1">COD ${item.cod}</span>` : ''}
+          </td>
+          <td class="py-2.5 px-3 text-right">
+            <button onclick="markReceived('${item.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-lg border border-emerald-200 font-semibold">
+              <i class="fa-solid fa-check mr-1"></i> รับแล้ว
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      if (overdueCount > 0) {
+        navBadge.textContent = overdueCount;
+        navBadge.classList.remove('hidden');
+      } else {
+        navBadge.classList.add('hidden');
+      }
+    }
+
     async function markReceived(id) {
+      const rec = currentDormRecords.find(r => r.id === id);
+      if (rec) rec.status = 'received';
+      renderInventoryTable();
+      renderMonthlyStats();
+
       await callGasBackend({ action: "mark_received", dormId: currentUser.dormId, id: id });
-      fetchDormInventory(false);
+    }
+
+    function generateOverdueLineMessage() {
+      const today = new Date();
+      const overdueList = currentDormRecords.filter(r => {
+        if (r.status !== 'pending') return false;
+        return Math.floor((today - new Date(r.date)) / (1000 * 60 * 60 * 24)) >= 3;
+      });
+
+      if (overdueList.length === 0) return alert('ยอดเยี่ยม! ไม่มีพัสดุตกค้างเกิน 3 วันในขณะนี้');
+
+      const counts = {};
+      overdueList.forEach(r => counts[r.target] = (counts[r.target] || 0) + 1);
+
+      const lines = [
+        `⚠️ ประกาศแจ้งเตือนพัสดุตกค้าง (${currentUser.dormName})`,
+        `มีพัสดุค้างรับเกิน 3 วันขึ้นไป (รวม ${overdueList.length} ชิ้น):`
+      ];
+
+      Object.keys(counts).forEach(k => {
+        lines.push(`ห้อง/ผู้รับ: ${k} ( ค้าง ${counts[k]} ชิ้น )`);
+      });
+
+      lines.push('');
+      lines.push('รบกวนลูกบ้านติดต่อรับของด่วนที่ออฟฟิศ เพื่อป้องกันสิ่งของสูญหาย ขอบคุณครับ');
+
+      window.location.href = `https://line.me/R/msg/text/?${encodeURIComponent(lines.join('\n'))}`;
+    }
+
+    // สถิติรายเดือน & โหลดชีตลงเครื่อง (Excel CSV)
+    function renderMonthlyStats() {
+      const monthStr = document.getElementById('statsMonthPicker').value;
+      const search = document.getElementById('statsSearchRoomInput').value.toLowerCase().trim();
+      const tbody = document.getElementById('monthlySummaryTbody');
+
+      const monthRecords = currentDormRecords.filter(r => r.date.startsWith(monthStr));
+      const roomCounts = {};
+      monthRecords.forEach(r => roomCounts[r.target] = (roomCounts[r.target] || 0) + 1);
+
+      const rooms = Object.keys(roomCounts).filter(rm => rm.toLowerCase().includes(search));
+      rooms.sort((a, b) => {
+        const na = parseInt(a, 10), nb = parseInt(b, 10);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        if (!isNaN(na)) return -1;
+        if (!isNaN(nb)) return 1;
+        return a.localeCompare(b, 'th');
+      });
+
+      const total = monthRecords.length;
+      const recip = Object.keys(roomCounts).length;
+      const avg = recip > 0 ? (total / recip).toFixed(1) : 0;
+
+      document.getElementById('statTotalMonth').textContent = `${total} ชิ้น`;
+      document.getElementById('statRecipientsMonth').textContent = `${recip} ราย`;
+      document.getElementById('statAvgMonth').textContent = `${avg} ชิ้น`;
+      document.getElementById('monthlyRowCountBadge').textContent = `${rooms.length} รายการ`;
+
+      tbody.innerHTML = '';
+      if (rooms.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="py-8 text-center text-slate-400">ไม่พบสถิติพัสดุในเดือนนี้</td></tr>`;
+        return;
+      }
+
+      rooms.forEach(rm => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 font-bold text-slate-700">${rm}</td>
+          <td class="py-2.5 px-4 text-center">
+            <span class="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-0.5 rounded-full font-bold">${roomCounts[rm]} ชิ้น</span>
+          </td>
+          <td class="py-2.5 px-4 text-right">
+            <span class="text-xs text-slate-400">บันทึกแล้ว</span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportMonthlyCsv() {
+      const monthStr = document.getElementById('statsMonthPicker').value;
+      const monthRecords = currentDormRecords.filter(r => r.date.startsWith(monthStr));
+      if (!monthRecords.length) return alert('ไม่มีข้อมูลสำหรับ Export ในเดือนนี้');
+
+      const roomCounts = {};
+      monthRecords.forEach(r => roomCounts[r.target] = (roomCounts[r.target] || 0) + 1);
+
+      let csv = "\uFEFFหอพัก,ห้อง/ผู้รับ,จำนวนพัสดุ (ชิ้น),เดือน\n";
+      Object.keys(roomCounts).forEach(rm => {
+        csv += `"${currentUser.dormName}","${rm}",${roomCounts[rm]},"${monthStr}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `สรุปพัสดุ_${currentUser.dormName}_${monthStr}.csv`;
+      link.click();
     }
 
     function fileToBase64(file) {
