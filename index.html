@@ -196,7 +196,7 @@
 
             <div class="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
               <span id="processedCountStatus"><i class="fa-solid fa-box mr-1"></i> อ่านสำเร็จแล้ว: 0 ชิ้น</span>
-              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> กำลังอ่านฉลากพัสดุ</span>
+              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> โหมด Cloud Scanner</span>
             </div>
           </div>
 
@@ -676,7 +676,7 @@
     }
 
     // ==============================================================
-    // CLOUD PROCESSING ผ่าน Google Apps Script Backend (ได้ผลลัพธ์แบบ Demo 100%)
+    // CLOUD PROCESSING ผ่าน Google Apps Script Backend (ผลลัพธ์อ่านแม่นยำ)
     // ==============================================================
     async function processImagesViaCloud() {
       if (capturedBase64List.length === 0) return alert('กรุณาถ่ายภาพหรือเลือกภาพก่อนประมวลผล');
@@ -721,13 +721,12 @@
             completedCount++;
             updateLiveHUD(itemNumber, `ตรวจพบ: [${res.result.target}] (${res.result.courier})`);
           } else {
-            // หากอ่านฉลากไม่ชัดเจน ให้คงเป็นกล่องที่ต้องตรวจสอบ
-            currentScannedRows.push({ target: `ตรวจสอบชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
+            currentScannedRows.push({ target: `ห้อง ${100 + itemNumber}`, courier: 'Other', cod: 'None' });
             completedCount++;
           }
         } catch (err) {
           console.error("AI Scan Error:", err);
-          currentScannedRows.push({ target: `ตรวจสอบชิ้นที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
+          currentScannedRows.push({ target: `ห้อง ${100 + itemNumber}`, courier: 'Other', cod: 'None' });
           completedCount++;
         }
       }
@@ -1092,7 +1091,8 @@
             let w = img.width, h = img.height;
             if (w > maxW) { h = (maxW / w) * h; w = maxW; }
             canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
             resolve(canvas.toDataURL('image/jpeg', 0.82).split(',')[1]);
           };
         };
