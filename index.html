@@ -196,7 +196,7 @@
 
             <div class="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
               <span id="processedCountStatus"><i class="fa-solid fa-box mr-1"></i> อ่านสำเร็จแล้ว: 0 ชิ้น</span>
-              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> โหมด Cloud Scanner</span>
+              <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> กำลังอ่านฉลากพัสดุ</span>
             </div>
           </div>
 
@@ -645,7 +645,7 @@
       flash.classList.add('shutter-flash');
       setTimeout(() => flash.classList.remove('shutter-flash'), 150);
 
-      const maxW = 900;
+      const maxW = 1000;
       let w = vid.videoWidth || 800;
       let h = vid.videoHeight || 600;
       if (w > maxW) { h = (maxW / w) * h; w = maxW; }
@@ -653,7 +653,7 @@
       cvs.width = w;
       cvs.height = h;
       cvs.getContext('2d').drawImage(vid, 0, 0, w, h);
-      const b64 = cvs.toDataURL('image/jpeg', 0.82).split(',')[1];
+      const b64 = cvs.toDataURL('image/jpeg', 0.8).split(',')[1];
       capturedBase64List.push(b64);
       document.getElementById('snapCountThumb').innerText = `${capturedBase64List.length} รูป`;
     }
@@ -721,12 +721,14 @@
             completedCount++;
             updateLiveHUD(itemNumber, `ตรวจพบ: [${res.result.target}] (${res.result.courier})`);
           } else {
-            currentScannedRows.push({ target: `ห้อง ${100 + itemNumber}`, courier: 'Other', cod: 'None' });
+            const errDetail = res ? res.message : "No response";
+            console.error("AI Error Item " + itemNumber + ":", errDetail);
+            currentScannedRows.push({ target: `ตรวจสอบฉลากภาพที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
             completedCount++;
           }
         } catch (err) {
           console.error("AI Scan Error:", err);
-          currentScannedRows.push({ target: `ห้อง ${100 + itemNumber}`, courier: 'Other', cod: 'None' });
+          currentScannedRows.push({ target: `ตรวจสอบฉลากภาพที่ ${itemNumber}`, courier: 'Other', cod: 'None' });
           completedCount++;
         }
       }
@@ -1078,6 +1080,7 @@
       link.click();
     }
 
+    // ฟังก์ชันย่อขนาดภาพให้พอดีสำหรับ OCR โดยไม่หนัก Payload
     function fileToBase64(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -1087,13 +1090,13 @@
           img.src = e.target.result;
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const maxW = 900;
+            const maxW = 1000;
             let w = img.width, h = img.height;
             if (w > maxW) { h = (maxW / w) * h; w = maxW; }
             canvas.width = w; canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.82).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
           };
         };
       });
