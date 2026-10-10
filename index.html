@@ -404,7 +404,7 @@
       }
     }
 
-    // ประมวลผลภาพทั้งหมดผ่าน Apps Script Backend (แก้ 401 แน่นอน)
+    // ประมวลผลภาพผ่าน Backend Proxy
     async function processImagesViaBackend() {
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
@@ -641,7 +641,6 @@
       flash.classList.add('shutter-flash');
       setTimeout(() => flash.classList.remove('shutter-flash'), 150);
 
-      // ขนาด 800px พอเหมาะ ส่งเข้า Apps Script ได้เร็ว ภาพไม่แตก
       const maxW = 800;
       let w = vid.videoWidth || 800;
       let h = vid.videoHeight || 600;
