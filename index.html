@@ -288,15 +288,15 @@
         <div class="grid grid-cols-3 gap-2 text-center">
           <div class="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200">
             <p class="text-[10px] text-slate-400">พัสดุเดือนนี้</p>
-            <h3 id="statTotalMonth" class="text-base sm:lg font-bold text-indigo-600 mt-0.5">0 ชิ้น</h3>
+            <h3 id="statTotalMonth" class="text-base sm:text-lg font-bold text-indigo-600 mt-0.5">0 ชิ้น</h3>
           </div>
           <div class="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200">
             <p class="text-[10px] text-slate-400">ห้องที่มีพัสดุ</p>
-            <h3 id="statRecipientsMonth" class="text-base sm:lg font-bold text-slate-700 mt-0.5">0 ราย</h3>
+            <h3 id="statRecipientsMonth" class="text-base sm:text-lg font-bold text-slate-700 mt-0.5">0 ราย</h3>
           </div>
           <div class="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200">
             <p class="text-[10px] text-slate-400">เฉลี่ยต่อห้อง</p>
-            <h3 id="statAvgMonth" class="text-base sm:lg font-bold text-emerald-600 mt-0.5">0 ชิ้น</h3>
+            <h3 id="statAvgMonth" class="text-base sm:text-lg font-bold text-emerald-600 mt-0.5">0 ชิ้น</h3>
           </div>
         </div>
 
@@ -414,7 +414,7 @@
       }
     }
 
-    // ประมวลผลภาพทีละภาพ แจ้งเตือนข้อผิดพลาดจริงหากอ่านไม่ได้
+    // ประมวลผลภาพทีละภาพ โชว์ Error ให้เห็นชัดๆ
     async function processImagesViaBackend() {
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
@@ -517,7 +517,7 @@
         if (!isNaN(na) && !isNaN(nb)) return na - nb;
         if (!isNaN(na)) return -1;
         if (!isNaN(nb)) return 1;
-        return a.displayName.localeCompare(b, 'th');
+        return a.displayName.localeCompare(b.displayName, 'th');
       });
 
       const header = (currentUser && currentUser.tplHeader) ? currentUser.tplHeader : '━━━━━━━━━━━━━━━\n📦 แจ้งเตือนพัสดุเข้าใหม่ประจำวัน\n━━━━━━━━━━━━━━━';
