@@ -196,7 +196,7 @@
             </h3>
             <span id="outputBadgeCount" class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">0 ชิ้น</span>
           </div>
-          <textarea id="finalLineTemplate" rows="8" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed"></textarea>
+          <textarea id="finalLineTemplate" rows="10" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed"></textarea>
           <div class="grid grid-cols-2 gap-2">
             <button onclick="shareDirectToLine()" class="bg-[#06C755] active:bg-[#05a346] text-white py-2.5 px-2 rounded-xl font-bold text-xs shadow flex items-center justify-center gap-1.5">
               <i class="fa-brands fa-line text-base"></i>
@@ -322,11 +322,11 @@
           <div class="space-y-2.5">
             <div>
               <label class="block font-semibold text-slate-700 mb-1">ข้อความเปิดหัวประกาศ (Header):</label>
-              <input type="text" id="tplHeaderInput" class="w-full border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <textarea id="tplHeaderInput" rows="3" class="w-full border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
             </div>
             <div>
               <label class="block font-semibold text-slate-700 mb-1">ข้อความปิดท้ายประกาศ (Footer):</label>
-              <textarea id="tplFooterInput" rows="2" class="w-full border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+              <textarea id="tplFooterInput" rows="3" class="w-full border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
             </div>
             <button onclick="saveLineTemplates()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2 rounded-xl shadow transition">
               <i class="fa-solid fa-floppy-disk mr-1"></i> บันทึกเทมเพลตลงฐานข้อมูล
@@ -381,10 +381,9 @@
 
   <script>
     // ==========================================
-    // ตัวแปรตั้งค่าระบบ (ตัดช่องว่างและเครื่องหมายแปลกปลอมออกอัตโนมัติ)
+    // ตั้งค่า API KEY และ Apps Script Endpoint
     // ==========================================
-    const RAW_API_KEY = "AQ.Ab8RN6JI1AvhMp2kLRrbZnxTJT5VEHMaxvd6h3iY_Ff6eRrzlw";
-    const GEMINI_DIRECT_API_KEY = RAW_API_KEY.trim();
+    const GEMINI_DIRECT_API_KEY = "AQ.Ab8RN6JI1AvhMp2kLRrbZnxTJT5VEHMaxvd6h3iY_Ff6eRrzlw".trim();
     const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyfF8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec";
 
     let currentUser = null;
@@ -410,17 +409,21 @@
     }
 
     // =========================================================
-    // ฟังก์ชันอ่านภาพด้วย Gemini AI (ส่ง Header x-goog-api-key ทางเดียวเท่านั้น)
+    // ฟังก์ชัน OCR ผ่าน gemini-3.6-flash (แก้ 401 สำหรับคีย์ AQ. โดยเฉพาะ)
     // =========================================================
     async function callGeminiDirectOCR(base64Image) {
-      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+      // สำหรับ AQ. Auth Key ต้องใช้ endpoint gemini-3.6-flash หรือ gemini-1.5-flash-latest ผ่าน ?key= เท่านั้น
+      const candidateEndpoints = [
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
+      ];
 
-      const prompt = `ภาพนี้คือฉลากหน้ากล่องพัสดุ ช่วยอ่านข้อความดังต่อไปนี้:
-1. "เลขห้อง" (เช่น 105, 205, 405, 408) หรือถ้าไม่มีเลขห้องให้หา "ชื่อผู้รับ" (เช่น ศศิณา, พุธิตา, ทิฟฟี่แผงสีเขียว หรือชื่อภาษาอังกฤษ)
-2. ค่ายขนส่ง (เช่น SPX, Flash, J&T, KEX, EMS หรือ Other)
-3. ยอดเงินเก็บปลายทาง COD (ถ้าไม่มีให้ตอบ None)
+      const prompt = `จากภาพฉลากพัสดุนี้ ช่วยระบุ:
+1. "เลขห้อง" เป็นอันดับแรก (เช่น 105, 205, 405, 408) หรือหากไม่มีเลขห้อง ให้ดึง "ชื่อผู้รับ" (เช่น ศศิณา, พุธิตา, ทิฟฟี่แผงสีเขียว หรือชื่อภาษาอังกฤษ)
+2. ค่ายขนส่ง (SPX, Flash, J&T, KEX, EMS หรือ Other)
+3. ยอด COD (ตัวเลข หรือ None)
 
-ตอบกลับเป็น 3 บรรทัดนี้เท่านั้น:
+ตอบเป็น 3 บรรทัดนี้เท่านั้น:
 TARGET: [เลขห้อง หรือ ชื่อผู้รับ]
 COURIER: [ค่ายขนส่ง]
 COD: [ยอดเงิน หรือ None]`;
@@ -434,54 +437,61 @@ COD: [ยอดเงิน หรือ None]`;
         }]
       };
 
-      // ส่งคีย์ทาง Header x-goog-api-key ทางเดียวเท่านั้น (ห้ามใส่ ?key= ที่ URL)
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-goog-api-key': GEMINI_DIRECT_API_KEY
-        },
-        body: JSON.stringify(payload)
-      });
+      let lastError = null;
 
-      if (!res.ok) {
-        const errTxt = await res.text();
-        console.error("Gemini Error:", errTxt);
-        throw new Error(`HTTP ${res.status}: ${errTxt}`);
+      for (let baseUrl of candidateEndpoints) {
+        try {
+          const url = `${baseUrl}?key=${GEMINI_DIRECT_API_KEY}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) {
+            const errTxt = await res.text();
+            lastError = new Error(`HTTP ${res.status}: ${errTxt}`);
+            continue;
+          }
+
+          const json = await res.json();
+          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+          let target = "";
+          let courier = "Other";
+          let cod = "None";
+
+          const targetMatch = rawText.match(/TARGET:\s*([^\n\r]+)/i);
+          if (targetMatch && targetMatch[1]) {
+            target = targetMatch[1].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
+          }
+
+          const courierMatch = rawText.match(/COURIER:\s*([^\n\r]+)/i);
+          if (courierMatch && courierMatch[1]) {
+            const c = courierMatch[1].trim();
+            if (/flash/i.test(c)) courier = 'Flash';
+            else if (/spx|shopee/i.test(c)) courier = 'SPX';
+            else if (/j&t|jnt/i.test(c)) courier = 'J&T';
+            else if (/kex|kerry/i.test(c)) courier = 'KEX';
+            else if (/ems|ไปรษณีย์/i.test(c)) courier = 'EMS';
+          }
+
+          const codMatch = rawText.match(/COD:\s*([^\n\r]+)/i);
+          if (codMatch && codMatch[1]) {
+            cod = codMatch[1].trim();
+          }
+
+          if (!target) {
+            target = rawText.split('\n')[0].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
+          }
+
+          return { target: target || "ไม่ระบุ", courier, cod };
+        } catch (err) {
+          lastError = err;
+        }
       }
 
-      const json = await res.json();
-      const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      let target = "";
-      let courier = "Other";
-      let cod = "None";
-
-      const targetMatch = rawText.match(/TARGET:\s*([^\n\r]+)/i);
-      if (targetMatch && targetMatch[1]) {
-        target = targetMatch[1].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
-      }
-
-      const courierMatch = rawText.match(/COURIER:\s*([^\n\r]+)/i);
-      if (courierMatch && courierMatch[1]) {
-        const c = courierMatch[1].trim();
-        if (/flash/i.test(c)) courier = 'Flash';
-        else if (/spx|shopee/i.test(c)) courier = 'SPX';
-        else if (/j&t|jnt/i.test(c)) courier = 'J&T';
-        else if (/kex|kerry/i.test(c)) courier = 'KEX';
-        else if (/ems|ไปรษณีย์/i.test(c)) courier = 'EMS';
-      }
-
-      const codMatch = rawText.match(/COD:\s*([^\n\r]+)/i);
-      if (codMatch && codMatch[1]) {
-        cod = codMatch[1].trim();
-      }
-
-      if (!target) {
-        target = rawText.split('\n')[0].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
-      }
-
-      return { target: target || "ไม่ระบุ", courier, cod };
+      throw lastError || new Error("Failed to authenticate with Gemini API");
     }
 
     // ประมวลผลภาพทั้งหมด + สั่ง Auto-save ลงชีตอัตโนมัติ
@@ -675,8 +685,8 @@ COD: [ยอดเงิน หรือ None]`;
         document.getElementById('staffManagementBox').classList.remove('hidden');
       }
 
-      document.getElementById('tplHeaderInput').value = currentUser.tplHeader || '📦 แจ้งเตือนพัสดุเข้าใหม่!';
-      document.getElementById('tplFooterInput').value = currentUser.tplFooter || '📍 ติดต่อรับพัสดุได้ที่ออฟฟิศ ชั้น 1 ได้ถึงเวลา 21.30 น.';
+      document.getElementById('tplHeaderInput').value = currentUser.tplHeader || '━━━━━━━━━━━━━━━\n📦 แจ้งเตือนพัสดุเข้าใหม่ประจำวัน\n━━━━━━━━━━━━━━━';
+      document.getElementById('tplFooterInput').value = currentUser.tplFooter || '━━━━━━━━━━━━━━━\n📍 จุดรับ: ออฟฟิศ ชั้น 1 (ถึง 21.30 น.)\nขอบคุณครับ/ค่ะ 🙏';
     }
 
     function switchTab(t) {
@@ -718,18 +728,19 @@ COD: [ยอดเงิน หรือ None]`;
       flash.classList.add('shutter-flash');
       setTimeout(() => flash.classList.remove('shutter-flash'), 150);
 
+      // ขนาดภาพคมชัดสูง พอเหมาะกับการอ่าน OCR
       const maxW = 1200;
       let w = vid.videoWidth || 1280;
       let h = vid.videoHeight || 720;
       if (w > maxW) {
-        h = (maxW / w) * h;
+        h = Math.round((maxW / w) * h);
         w = maxW;
       }
 
       cvs.width = w;
       cvs.height = h;
       cvs.getContext('2d').drawImage(vid, 0, 0, w, h);
-      const b64 = cvs.toDataURL('image/jpeg', 0.88).split(',')[1];
+      const b64 = cvs.toDataURL('image/jpeg', 0.90).split(',')[1];
       capturedBase64List.push(b64);
       document.getElementById('snapCountThumb').innerText = `${capturedBase64List.length} รูป`;
     }
@@ -808,7 +819,7 @@ COD: [ยอดเงิน หรือ None]`;
       generateLineTemplate();
     }
 
-    // สร้างเทมเพลต LINE แบบรวมชิ้น (สั้นกระชับ ไม่มีขนส่ง/COD)
+    // สร้างเทมเพลต LINE แบบรวมชิ้น (สั้นกระชับ สวยงาม)
     function generateLineTemplate() {
       const sec = document.getElementById('outputSection');
       if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
@@ -828,12 +839,13 @@ COD: [ยอดเงิน หรือ None]`;
         return a.localeCompare(b, 'th');
       });
 
-      const header = (currentUser && currentUser.tplHeader) ? currentUser.tplHeader : '📦 แจ้งเตือนพัสดุเข้าใหม่!';
-      const footer = (currentUser && currentUser.tplFooter) ? currentUser.tplFooter : '📍 ติดต่อรับพัสดุได้ที่ออฟฟิศ ชั้น 1 ได้ถึงเวลา 21.30 น.';
+      const header = (currentUser && currentUser.tplHeader) ? currentUser.tplHeader : '━━━━━━━━━━━━━━━\n📦 แจ้งเตือนพัสดุเข้าใหม่ประจำวัน\n━━━━━━━━━━━━━━━';
+      const footer = (currentUser && currentUser.tplFooter) ? currentUser.tplFooter : '━━━━━━━━━━━━━━━\n📍 จุดรับ: ออฟฟิศ ชั้น 1 (ถึง 21.30 น.)\nขอบคุณครับ/ค่ะ 🙏';
 
       const lines = [
         header,
-        `(รวม ${currentScannedRows.length} ชิ้น)`
+        `(รวมทั้งหมด ${currentScannedRows.length} ชิ้น)`,
+        ''
       ];
 
       keys.forEach(k => {
@@ -1086,11 +1098,15 @@ COD: [ยอดเงิน หรือ None]`;
             const canvas = document.createElement('canvas');
             const maxW = 1200;
             let w = img.width, h = img.height;
-            if (w > maxW) { h = (maxW / w) * h; w = maxW; }
-            canvas.width = w; canvas.height = h;
+            if (w > maxW) {
+              h = Math.round((maxW / w) * h);
+              w = maxW;
+            }
+            canvas.width = w;
+            canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.88).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.90).split(',')[1]);
           };
         };
       });
