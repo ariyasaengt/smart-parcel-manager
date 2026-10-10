@@ -414,7 +414,7 @@
       }
     }
 
-    // ประมวลผลภาพแบบรวดเร็ว (Parallel Concurrency)
+    // ประมวลผลภาพทีละภาพเพื่อความแม่นยำและป้องกัน Rate Limit
     async function processImagesViaBackend() {
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
@@ -423,36 +423,23 @@
       loader.classList.remove('hidden');
       currentScannedRows = [];
       const total = capturedBase64List.length;
-      let completed = 0;
 
-      // จัดการส่งคำขอแบบคู่ขนานครั้งละ 2 รูป เพื่อความเร็วสูงสุดและไม่ติด Rate Limit
-      const concurrency = 2;
-      const chunks = [];
-      for (let i = 0; i < total; i += concurrency) {
-        chunks.push(capturedBase64List.slice(i, i + concurrency));
-      }
+      for (let i = 0; i < total; i++) {
+        const pct = Math.round(((i + 1) / total) * 100);
+        bar.style.width = `${pct}%`;
+        label.innerText = `AI กำลังอ่านภาพ ${i + 1}/${total} (${pct}%)`;
 
-      for (const chunk of chunks) {
-        const promises = chunk.map(async (b64) => {
-          try {
-            const res = await callGasBackend({ action: "ai_scan", base64: b64 });
-            completed++;
-            const pct = Math.round((completed / total) * 100);
-            bar.style.width = `${pct}%`;
-            label.innerText = `AI กำลังอ่านภาพ ${completed}/${total} (${pct}%)`;
-
-            if (res.status === "success" && res.result) {
-              return res.result;
-            }
-            return { target: "ไม่ระบุ", courier: "Other", cod: "None" };
-          } catch (e) {
-            completed++;
-            return { target: "ไม่ระบุ", courier: "Other", cod: "None" };
+        try {
+          const res = await callGasBackend({ action: "ai_scan", base64: capturedBase64List[i] });
+          if (res.status === "success" && res.result) {
+            currentScannedRows.push(res.result);
+          } else {
+            currentScannedRows.push({ target: "ห้อง...", courier: "Other", cod: "None" });
           }
-        });
-
-        const results = await Promise.all(promises);
-        currentScannedRows.push(...results);
+        } catch (e) {
+          console.error("OCR Error on item " + i, e);
+          currentScannedRows.push({ target: "ห้อง...", courier: "Other", cod: "None" });
+        }
       }
 
       loader.classList.add('hidden');
@@ -464,7 +451,6 @@
       }
     }
 
-    // ฟังก์ชันคำนวณความคล้ายของชื่อเพื่อรวมคนเดียวกัน (Fuzzy Similarity)
     function normalizeThaiName(str) {
       return str.replace(/[่้๊๋์]/g, '').trim().toLowerCase();
     }
@@ -475,19 +461,15 @@
       const cleanB = normalizeThaiName(nameB);
       if (cleanA === cleanB) return true;
 
-      // ถ้าเป็นตัวเลขห้อง (เช่น 105 กับ 205) ต้องไม่รวม
       if (!isNaN(cleanA) || !isNaN(cleanB)) return false;
 
-      // แยกดูชื่อและนามสกุล
       const partsA = cleanA.split(/\s+/);
       const partsB = cleanB.split(/\s+/);
 
-      // ถ้านามสกุลตรงกันเป๊ะ และชื่อขึ้นต้นคล้ายกัน (เช่น พุธิตา / พูธิดา กุวินวาจา)
       if (partsA.length > 1 && partsB.length > 1 && partsA[partsA.length - 1] === partsB[partsB.length - 1]) {
         return true;
       }
 
-      // Levenshtein distance สำหรับชื่อสั้นๆ
       if (Math.abs(cleanA.length - cleanB.length) <= 2) {
         let diff = 0;
         const minLen = Math.min(cleanA.length, cleanB.length);
@@ -501,24 +483,21 @@
       return false;
     }
 
-    // สร้างเทมเพลต LINE พร้อมระบบรวมชื่อคนเดียวกัน
     function generateLineTemplate() {
       const sec = document.getElementById('outputSection');
       if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
       sec.classList.remove('hidden');
 
-      // จัดกลุ่มคนเดียวกัน
-      const grouped = []; // [{ displayName: "...", count: 1 }]
+      const grouped = [];
 
       currentScannedRows.forEach(item => {
         const raw = item.target.trim();
-        if (!raw) return;
+        if (!raw || raw === "ไม่ระบุ") return;
 
         let found = false;
         for (let g of grouped) {
           if (isSamePerson(g.displayName, raw)) {
             g.count += 1;
-            // เลือกชื่อที่มีความสมบูรณ์หรือสะกดถูกต้องกว่า
             if (raw.length > g.displayName.length) g.displayName = raw;
             found = true;
             break;
@@ -530,7 +509,6 @@
         }
       });
 
-      // เรียงลำดับตัวเลขห้องขึ้นก่อน ตามด้วยชื่อ
       grouped.sort((a, b) => {
         const na = parseInt(a.displayName, 10), nb = parseInt(b.displayName, 10);
         if (!isNaN(na) && !isNaN(nb)) return na - nb;
@@ -561,7 +539,6 @@
       document.getElementById('outputBadgeCount').innerText = `${currentScannedRows.length} ชิ้น`;
     }
 
-    // ฟังก์ชันล้างข้อมูลทั้งหมดในหอพัก (สำหรับแอดมินทดสอบระบบ)
     async function clearAllDormData() {
       if (!currentUser) return;
       if (!confirm(`คุณต้องการลบข้อมูลพัสดุทั้งหมดของหอพัก "${currentUser.dormName}" ใช่หรือไม่?\n(ข้อมูลใน Google Sheets และบนหน้าจอจะถูกล้างทั้งหมด)`)) return;
@@ -779,10 +756,10 @@
       flash.classList.add('shutter-flash');
       setTimeout(() => flash.classList.remove('shutter-flash'), 150);
 
-      // ขนาด 720px เบาและคมชัด ส่งขึ้นไวมาก
-      const maxW = 720;
-      let w = vid.videoWidth || 720;
-      let h = vid.videoHeight || 540;
+      // ใช้ขนาด 1080px เพื่อให้ตัวเลขห้องและชื่อคมชัดเจน
+      const maxW = 1080;
+      let w = vid.videoWidth || 1080;
+      let h = vid.videoHeight || 810;
       if (w > maxW) {
         h = Math.round((maxW / w) * h);
         w = maxW;
@@ -791,7 +768,7 @@
       cvs.width = w;
       cvs.height = h;
       cvs.getContext('2d').drawImage(vid, 0, 0, w, h);
-      const b64 = cvs.toDataURL('image/jpeg', 0.8).split(',')[1];
+      const b64 = cvs.toDataURL('image/jpeg', 0.88).split(',')[1];
       capturedBase64List.push(b64);
       document.getElementById('snapCountThumb').innerText = `${capturedBase64List.length} รูป`;
     }
@@ -1104,7 +1081,7 @@
           img.src = e.target.result;
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const maxW = 720;
+            const maxW = 1080;
             let w = img.width, h = img.height;
             if (w > maxW) {
               h = Math.round((maxW / w) * h);
@@ -1114,7 +1091,7 @@
             canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.88).split(',')[1]);
           };
         };
       });
