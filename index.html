@@ -230,6 +230,10 @@
               <i class="fa-brands fa-line text-emerald-500"></i>
               <span>ทวงของค้าง LINE</span>
             </button>
+            <button onclick="clearAllDormData()" class="bg-rose-700/80 hover:bg-rose-800 text-white py-1.5 px-2 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-trash-can"></i>
+              <span>ล้างทั้งหมด</span>
+            </button>
           </div>
         </div>
 
@@ -269,10 +273,16 @@
               <input type="text" id="statsSearchRoomInput" placeholder="กรองห้อง/ชื่อ..." class="w-full border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
             </div>
           </div>
-          <button onclick="exportMonthlyCsv()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3 rounded-xl shadow transition flex items-center justify-center gap-1.5">
-            <i class="fa-solid fa-file-excel"></i>
-            <span>ดาวน์โหลดรายงานสรุป (Excel / CSV)</span>
-          </button>
+          <div class="flex gap-2">
+            <button onclick="exportMonthlyCsv()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3 rounded-xl shadow transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-file-excel"></i>
+              <span>ดาวน์โหลด Excel / CSV</span>
+            </button>
+            <button onclick="clearAllDormData()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-semibold py-2 px-3 rounded-xl transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-trash-can"></i>
+              <span>ล้างข้อมูลทั้งหมด</span>
+            </button>
+          </div>
         </div>
 
         <div class="grid grid-cols-3 gap-2 text-center">
@@ -404,7 +414,7 @@
       }
     }
 
-    // ประมวลผลภาพผ่าน Backend Proxy
+    // ประมวลผลภาพแบบรวดเร็ว (Parallel Concurrency)
     async function processImagesViaBackend() {
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
@@ -413,25 +423,36 @@
       loader.classList.remove('hidden');
       currentScannedRows = [];
       const total = capturedBase64List.length;
+      let completed = 0;
 
-      for (let i = 0; i < total; i++) {
-        const pct = Math.round(((i + 1) / total) * 100);
-        bar.style.width = `${pct}%`;
-        label.innerText = `AI กำลังอ่านภาพที่ ${i + 1}/${total} (${pct}%)`;
+      // จัดการส่งคำขอแบบคู่ขนานครั้งละ 2 รูป เพื่อความเร็วสูงสุดและไม่ติด Rate Limit
+      const concurrency = 2;
+      const chunks = [];
+      for (let i = 0; i < total; i += concurrency) {
+        chunks.push(capturedBase64List.slice(i, i + concurrency));
+      }
 
-        try {
-          const res = await callGasBackend({ action: "ai_scan", base64: capturedBase64List[i] });
-          if (res.status === "success" && res.result) {
-            currentScannedRows.push(res.result);
-          } else {
-            throw new Error(res.message || "ไม่สามารถอ่านภาพได้");
+      for (const chunk of chunks) {
+        const promises = chunk.map(async (b64) => {
+          try {
+            const res = await callGasBackend({ action: "ai_scan", base64: b64 });
+            completed++;
+            const pct = Math.round((completed / total) * 100);
+            bar.style.width = `${pct}%`;
+            label.innerText = `AI กำลังอ่านภาพ ${completed}/${total} (${pct}%)`;
+
+            if (res.status === "success" && res.result) {
+              return res.result;
+            }
+            return { target: "ไม่ระบุ", courier: "Other", cod: "None" };
+          } catch (e) {
+            completed++;
+            return { target: "ไม่ระบุ", courier: "Other", cod: "None" };
           }
-        } catch (e) {
-          console.error("OCR Error on item " + i, e);
-          alert("เกิดข้อผิดพลาดในการประมวลผล: " + e.message);
-          loader.classList.add('hidden');
-          return;
-        }
+        });
+
+        const results = await Promise.all(promises);
+        currentScannedRows.push(...results);
       }
 
       loader.classList.add('hidden');
@@ -440,6 +461,123 @@
 
       if (currentScannedRows.length > 0) {
         saveBatchToCloudSheet(false);
+      }
+    }
+
+    // ฟังก์ชันคำนวณความคล้ายของชื่อเพื่อรวมคนเดียวกัน (Fuzzy Similarity)
+    function normalizeThaiName(str) {
+      return str.replace(/[่้๊๋์]/g, '').trim().toLowerCase();
+    }
+
+    function isSamePerson(nameA, nameB) {
+      if (nameA === nameB) return true;
+      const cleanA = normalizeThaiName(nameA);
+      const cleanB = normalizeThaiName(nameB);
+      if (cleanA === cleanB) return true;
+
+      // ถ้าเป็นตัวเลขห้อง (เช่น 105 กับ 205) ต้องไม่รวม
+      if (!isNaN(cleanA) || !isNaN(cleanB)) return false;
+
+      // แยกดูชื่อและนามสกุล
+      const partsA = cleanA.split(/\s+/);
+      const partsB = cleanB.split(/\s+/);
+
+      // ถ้านามสกุลตรงกันเป๊ะ และชื่อขึ้นต้นคล้ายกัน (เช่น พุธิตา / พูธิดา กุวินวาจา)
+      if (partsA.length > 1 && partsB.length > 1 && partsA[partsA.length - 1] === partsB[partsB.length - 1]) {
+        return true;
+      }
+
+      // Levenshtein distance สำหรับชื่อสั้นๆ
+      if (Math.abs(cleanA.length - cleanB.length) <= 2) {
+        let diff = 0;
+        const minLen = Math.min(cleanA.length, cleanB.length);
+        for (let i = 0; i < minLen; i++) {
+          if (cleanA[i] !== cleanB[i]) diff++;
+        }
+        diff += Math.abs(cleanA.length - cleanB.length);
+        if (diff <= 2) return true;
+      }
+
+      return false;
+    }
+
+    // สร้างเทมเพลต LINE พร้อมระบบรวมชื่อคนเดียวกัน
+    function generateLineTemplate() {
+      const sec = document.getElementById('outputSection');
+      if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
+      sec.classList.remove('hidden');
+
+      // จัดกลุ่มคนเดียวกัน
+      const grouped = []; // [{ displayName: "...", count: 1 }]
+
+      currentScannedRows.forEach(item => {
+        const raw = item.target.trim();
+        if (!raw) return;
+
+        let found = false;
+        for (let g of grouped) {
+          if (isSamePerson(g.displayName, raw)) {
+            g.count += 1;
+            // เลือกชื่อที่มีความสมบูรณ์หรือสะกดถูกต้องกว่า
+            if (raw.length > g.displayName.length) g.displayName = raw;
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          grouped.push({ displayName: raw, count: 1 });
+        }
+      });
+
+      // เรียงลำดับตัวเลขห้องขึ้นก่อน ตามด้วยชื่อ
+      grouped.sort((a, b) => {
+        const na = parseInt(a.displayName, 10), nb = parseInt(b.displayName, 10);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        if (!isNaN(na)) return -1;
+        if (!isNaN(nb)) return 1;
+        return a.displayName.localeCompare(b.displayName, 'th');
+      });
+
+      const header = (currentUser && currentUser.tplHeader) ? currentUser.tplHeader : '━━━━━━━━━━━━━━━\n📦 แจ้งเตือนพัสดุเข้าใหม่ประจำวัน\n━━━━━━━━━━━━━━━';
+      const footer = (currentUser && currentUser.tplFooter) ? currentUser.tplFooter : '━━━━━━━━━━━━━━━\n📍 จุดรับ: ออฟฟิศ ชั้น 1 (ถึง 21.30 น.)\nขอบคุณครับ/ค่ะ 🙏';
+
+      const lines = [
+        header,
+        `(รวมทั้งหมด ${currentScannedRows.length} ชิ้น)`,
+        ''
+      ];
+
+      grouped.forEach(g => {
+        lines.push(g.count > 1 ? `ห้อง/ผู้รับ: ${g.displayName} ( ${g.count} ชิ้น )` : `ห้อง/ผู้รับ: ${g.displayName}`);
+      });
+
+      if (footer) {
+        lines.push('');
+        lines.push(footer);
+      }
+
+      document.getElementById('finalLineTemplate').value = lines.join('\n');
+      document.getElementById('outputBadgeCount').innerText = `${currentScannedRows.length} ชิ้น`;
+    }
+
+    // ฟังก์ชันล้างข้อมูลทั้งหมดในหอพัก (สำหรับแอดมินทดสอบระบบ)
+    async function clearAllDormData() {
+      if (!currentUser) return;
+      if (!confirm(`คุณต้องการลบข้อมูลพัสดุทั้งหมดของหอพัก "${currentUser.dormName}" ใช่หรือไม่?\n(ข้อมูลใน Google Sheets และบนหน้าจอจะถูกล้างทั้งหมด)`)) return;
+
+      try {
+        const res = await callGasBackend({ action: "clear_all_parcels", dormId: currentUser.dormId });
+        if (res.status === "success") {
+          currentDormRecords = [];
+          renderInventoryTable();
+          renderMonthlyStats();
+          alert('ล้างข้อมูลพัสดุทั้งหมดเรียบร้อยแล้ว!');
+        } else {
+          alert(res.message || 'ไม่สามารถล้างข้อมูลได้');
+        }
+      } catch (e) {
+        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
       }
     }
 
@@ -641,9 +779,10 @@
       flash.classList.add('shutter-flash');
       setTimeout(() => flash.classList.remove('shutter-flash'), 150);
 
-      const maxW = 800;
-      let w = vid.videoWidth || 800;
-      let h = vid.videoHeight || 600;
+      // ขนาด 720px เบาและคมชัด ส่งขึ้นไวมาก
+      const maxW = 720;
+      let w = vid.videoWidth || 720;
+      let h = vid.videoHeight || 540;
       if (w > maxW) {
         h = Math.round((maxW / w) * h);
         w = maxW;
@@ -683,8 +822,8 @@
         { target: "408", courier: "J&T", cod: "None" },
         { target: "ทิฟฟี่แผงสีเขียว", courier: "KEX", cod: "COD" },
         { target: "พุฒิตา", courier: "Other", cod: "None" },
-        { target: "พุธิตา", courier: "EMS", cod: "None" },
-        { target: "พุธิตา", courier: "EMS", cod: "None" },
+        { target: "พุธิตา กุวินวาจา", courier: "EMS", cod: "None" },
+        { target: "พูธิดา กุวินวาจา", courier: "EMS", cod: "None" },
         { target: "ศศิณา", courier: "SPX", cod: "None" },
         { target: "ศศิณา", courier: "SPX", cod: "None" }
       ];
@@ -729,48 +868,6 @@
       currentScannedRows.push({ target: "ห้อง...", courier: "Other", cod: "None" });
       renderInspectionTable();
       generateLineTemplate();
-    }
-
-    function generateLineTemplate() {
-      const sec = document.getElementById('outputSection');
-      if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
-      sec.classList.remove('hidden');
-
-      const counts = {};
-      currentScannedRows.forEach(i => {
-        const k = i.target.trim();
-        if (k) counts[k] = (counts[k] || 0) + 1;
-      });
-
-      const keys = Object.keys(counts).sort((a, b) => {
-        const na = parseInt(a, 10), nb = parseInt(b, 10);
-        if (!isNaN(na) && !isNaN(nb)) return na - nb;
-        if (!isNaN(na)) return -1;
-        if (!isNaN(nb)) return 1;
-        return a.localeCompare(b, 'th');
-      });
-
-      const header = (currentUser && currentUser.tplHeader) ? currentUser.tplHeader : '━━━━━━━━━━━━━━━\n📦 แจ้งเตือนพัสดุเข้าใหม่ประจำวัน\n━━━━━━━━━━━━━━━';
-      const footer = (currentUser && currentUser.tplFooter) ? currentUser.tplFooter : '━━━━━━━━━━━━━━━\n📍 จุดรับ: ออฟฟิศ ชั้น 1 (ถึง 21.30 น.)\nขอบคุณครับ/ค่ะ 🙏';
-
-      const lines = [
-        header,
-        `(รวมทั้งหมด ${currentScannedRows.length} ชิ้น)`,
-        ''
-      ];
-
-      keys.forEach(k => {
-        const c = counts[k];
-        lines.push(c > 1 ? `ห้อง/ผู้รับ: ${k} ( ${c} ชิ้น )` : `ห้อง/ผู้รับ: ${k}`);
-      });
-
-      if (footer) {
-        lines.push('');
-        lines.push(footer);
-      }
-
-      document.getElementById('finalLineTemplate').value = lines.join('\n');
-      document.getElementById('outputBadgeCount').innerText = `${currentScannedRows.length} ชิ้น`;
     }
 
     async function saveLineTemplates() {
@@ -1007,7 +1104,7 @@
           img.src = e.target.result;
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const maxW = 800;
+            const maxW = 720;
             let w = img.width, h = img.height;
             if (w > maxW) {
               h = Math.round((maxW / w) * h);
