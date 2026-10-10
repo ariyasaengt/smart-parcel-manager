@@ -414,7 +414,7 @@
       }
     }
 
-    // ประมวลผลภาพทีละภาพ โชว์ Error ให้เห็นชัดๆ และไม่กลืนบั๊ก
+// ประมวลผลภาพทีละภาพ พร้อมระบบ Retry อัตโนมัติ 3 ครั้งเมื่อเจอ High Demand
     async function processImagesViaBackend() {
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
@@ -429,19 +429,41 @@
         bar.style.width = `${pct}%`;
         label.innerText = `AI กำลังอ่านภาพที่ ${i + 1}/${total} (${pct}%)`;
 
-        try {
-          const res = await callGasBackend({ action: "ai_scan", base64: capturedBase64List[i] });
-          if (res.status === "success" && res.result) {
-            currentScannedRows.push(res.result);
-          } else {
-            alert(`ภาพที่ ${i + 1} ไม่สามารถประมวลผลได้: ${res.message || 'เกิดข้อผิดพลาด'}`);
-            loader.classList.add('hidden');
-            return;
+        let success = false;
+        let attempt = 0;
+        const maxRetries = 3; // กำหนดจำนวนรอบที่ยอมให้ลองใหม่
+
+        while (!success && attempt < maxRetries) {
+          try {
+            const res = await callGasBackend({ action: "ai_scan", base64: capturedBase64List[i] });
+            
+            if (res.status === "success" && res.result) {
+              currentScannedRows.push(res.result);
+              success = true; // ทำงานสำเร็จ ออกจากลูป while
+            } else {
+              // ถ้ามาจาก Google แล้วบอกว่า Error แต่ไม่ใช่ High Demand
+              if (res.message && !res.message.includes("High Demand") && !res.message.includes("quota")) {
+                 alert(`ภาพที่ ${i + 1} ไม่สามารถประมวลผลได้: ${res.message}`);
+                 loader.classList.add('hidden');
+                 return;
+              }
+              // ถ้าเป็น High Demand ให้ลองใหม่
+              throw new Error(res.message || "เกิดข้อผิดพลาด");
+            }
+          } catch (e) {
+            attempt++;
+            console.log(`ภาพที่ ${i + 1} ล้มเหลวครั้งที่ ${attempt}: ${e.message}`);
+            
+            if (attempt >= maxRetries) {
+              alert(`ภาพที่ ${i + 1} ขัดข้อง (ลองซ้ำ ${maxRetries} ครั้งแล้วระบบยังหนาแน่นอยู่): ${e.message}`);
+              loader.classList.add('hidden');
+              return;
+            } else {
+               // รอ 3 วินาทีก่อนลองใหม่
+               label.innerText = `ระบบ AI หนาแน่น กำลังลองใหม่ภาพที่ ${i + 1} (รอบ ${attempt + 1}/${maxRetries})...`;
+               await new Promise(resolve => setTimeout(resolve, 3000));
+            }
           }
-        } catch (e) {
-          alert(`ภาพที่ ${i + 1} ขัดข้อง: ${e.message}`);
-          loader.classList.add('hidden');
-          return;
         }
       }
 
