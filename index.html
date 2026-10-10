@@ -146,7 +146,7 @@
               <button onclick="clearCaptured()" class="text-rose-500 text-[11px] hover:underline">ล้างทั้งหมด</button>
             </div>
             <div id="thumbnailsGrid" class="grid grid-cols-5 sm:grid-cols-7 gap-1 max-h-32 overflow-y-auto p-1 bg-slate-50 rounded-xl border"></div>
-            <button id="runAiScanBtn" onclick="processImagesDirectGemini()" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow">
+            <button id="runAiScanBtn" onclick="processImagesViaBackend()" class="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow">
               <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> ประมวลผลอ่านข้อมูลพัสดุด้วย AI ทันที
             </button>
           </div>
@@ -380,10 +380,6 @@
   </div>
 
   <script>
-    // ==========================================
-    // ตั้งค่า API KEY และ Apps Script Endpoint
-    // ==========================================
-    const GEMINI_DIRECT_API_KEY = "AQ.Ab8RN6JI1AvhMp2kLRrbZnxTJT5VEHMaxvd6h3iY_Ff6eRrzlw".trim();
     const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyfF8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec";
 
     let currentUser = null;
@@ -408,94 +404,8 @@
       }
     }
 
-    // =========================================================
-    // ฟังก์ชัน OCR ผ่าน gemini-3.6-flash (แก้ 401 สำหรับคีย์ AQ. โดยเฉพาะ)
-    // =========================================================
-    async function callGeminiDirectOCR(base64Image) {
-      // สำหรับ AQ. Auth Key ต้องใช้ endpoint gemini-3.6-flash หรือ gemini-1.5-flash-latest ผ่าน ?key= เท่านั้น
-      const candidateEndpoints = [
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
-      ];
-
-      const prompt = `จากภาพฉลากพัสดุนี้ ช่วยระบุ:
-1. "เลขห้อง" เป็นอันดับแรก (เช่น 105, 205, 405, 408) หรือหากไม่มีเลขห้อง ให้ดึง "ชื่อผู้รับ" (เช่น ศศิณา, พุธิตา, ทิฟฟี่แผงสีเขียว หรือชื่อภาษาอังกฤษ)
-2. ค่ายขนส่ง (SPX, Flash, J&T, KEX, EMS หรือ Other)
-3. ยอด COD (ตัวเลข หรือ None)
-
-ตอบเป็น 3 บรรทัดนี้เท่านั้น:
-TARGET: [เลขห้อง หรือ ชื่อผู้รับ]
-COURIER: [ค่ายขนส่ง]
-COD: [ยอดเงิน หรือ None]`;
-
-      const payload = {
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
-          ]
-        }]
-      };
-
-      let lastError = null;
-
-      for (let baseUrl of candidateEndpoints) {
-        try {
-          const url = `${baseUrl}?key=${GEMINI_DIRECT_API_KEY}`;
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-
-          if (!res.ok) {
-            const errTxt = await res.text();
-            lastError = new Error(`HTTP ${res.status}: ${errTxt}`);
-            continue;
-          }
-
-          const json = await res.json();
-          const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-          let target = "";
-          let courier = "Other";
-          let cod = "None";
-
-          const targetMatch = rawText.match(/TARGET:\s*([^\n\r]+)/i);
-          if (targetMatch && targetMatch[1]) {
-            target = targetMatch[1].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
-          }
-
-          const courierMatch = rawText.match(/COURIER:\s*([^\n\r]+)/i);
-          if (courierMatch && courierMatch[1]) {
-            const c = courierMatch[1].trim();
-            if (/flash/i.test(c)) courier = 'Flash';
-            else if (/spx|shopee/i.test(c)) courier = 'SPX';
-            else if (/j&t|jnt/i.test(c)) courier = 'J&T';
-            else if (/kex|kerry/i.test(c)) courier = 'KEX';
-            else if (/ems|ไปรษณีย์/i.test(c)) courier = 'EMS';
-          }
-
-          const codMatch = rawText.match(/COD:\s*([^\n\r]+)/i);
-          if (codMatch && codMatch[1]) {
-            cod = codMatch[1].trim();
-          }
-
-          if (!target) {
-            target = rawText.split('\n')[0].replace(/^(ห้อง|ผู้รับ|คุณ|นาย|นาง|น\.ส\.)\s*/i, '').trim();
-          }
-
-          return { target: target || "ไม่ระบุ", courier, cod };
-        } catch (err) {
-          lastError = err;
-        }
-      }
-
-      throw lastError || new Error("Failed to authenticate with Gemini API");
-    }
-
-    // ประมวลผลภาพทั้งหมด + สั่ง Auto-save ลงชีตอัตโนมัติ
-    async function processImagesDirectGemini() {
+    // ประมวลผลภาพทั้งหมดผ่าน Apps Script Backend (แก้ 401 แน่นอน)
+    async function processImagesViaBackend() {
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
       const label = document.getElementById('scanProgressLabel');
@@ -510,11 +420,15 @@ COD: [ยอดเงิน หรือ None]`;
         label.innerText = `AI กำลังอ่านภาพที่ ${i + 1}/${total} (${pct}%)`;
 
         try {
-          const item = await callGeminiDirectOCR(capturedBase64List[i]);
-          currentScannedRows.push(item);
+          const res = await callGasBackend({ action: "ai_scan", base64: capturedBase64List[i] });
+          if (res.status === "success" && res.result) {
+            currentScannedRows.push(res.result);
+          } else {
+            throw new Error(res.message || "ไม่สามารถอ่านภาพได้");
+          }
         } catch (e) {
           console.error("OCR Error on item " + i, e);
-          alert("เกิดข้อผิดพลาดในการเชื่อมต่อกับ Gemini API: " + e.message);
+          alert("เกิดข้อผิดพลาดในการประมวลผล: " + e.message);
           loader.classList.add('hidden');
           return;
         }
@@ -524,7 +438,6 @@ COD: [ยอดเงิน หรือ None]`;
       renderInspectionTable();
       generateLineTemplate();
 
-      // สั่ง Auto-save ลง Google Sheets อัตโนมัติทันที
       if (currentScannedRows.length > 0) {
         saveBatchToCloudSheet(false);
       }
@@ -728,10 +641,10 @@ COD: [ยอดเงิน หรือ None]`;
       flash.classList.add('shutter-flash');
       setTimeout(() => flash.classList.remove('shutter-flash'), 150);
 
-      // ขนาดภาพคมชัดสูง พอเหมาะกับการอ่าน OCR
-      const maxW = 1200;
-      let w = vid.videoWidth || 1280;
-      let h = vid.videoHeight || 720;
+      // ขนาด 800px พอเหมาะ ส่งเข้า Apps Script ได้เร็ว ภาพไม่แตก
+      const maxW = 800;
+      let w = vid.videoWidth || 800;
+      let h = vid.videoHeight || 600;
       if (w > maxW) {
         h = Math.round((maxW / w) * h);
         w = maxW;
@@ -740,7 +653,7 @@ COD: [ยอดเงิน หรือ None]`;
       cvs.width = w;
       cvs.height = h;
       cvs.getContext('2d').drawImage(vid, 0, 0, w, h);
-      const b64 = cvs.toDataURL('image/jpeg', 0.90).split(',')[1];
+      const b64 = cvs.toDataURL('image/jpeg', 0.8).split(',')[1];
       capturedBase64List.push(b64);
       document.getElementById('snapCountThumb').innerText = `${capturedBase64List.length} รูป`;
     }
@@ -819,7 +732,6 @@ COD: [ยอดเงิน หรือ None]`;
       generateLineTemplate();
     }
 
-    // สร้างเทมเพลต LINE แบบรวมชิ้น (สั้นกระชับ สวยงาม)
     function generateLineTemplate() {
       const sec = document.getElementById('outputSection');
       if (currentScannedRows.length === 0) { sec.classList.add('hidden'); return; }
@@ -1096,7 +1008,7 @@ COD: [ยอดเงิน หรือ None]`;
           img.src = e.target.result;
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const maxW = 1200;
+            const maxW = 800;
             let w = img.width, h = img.height;
             if (w > maxW) {
               h = Math.round((maxW / w) * h);
@@ -1106,7 +1018,7 @@ COD: [ยอดเงิน หรือ None]`;
             canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.90).split(',')[1]);
+            resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
           };
         };
       });
