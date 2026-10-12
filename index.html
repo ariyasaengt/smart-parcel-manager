@@ -116,7 +116,6 @@
 
     <main class="max-w-4xl mx-auto px-3.5 mt-3.5 space-y-3.5">
       
-      <!-- TAB 1: สแกน & นำเข้า -->
       <div id="viewScan" class="space-y-3.5">
         <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-center space-y-2.5">
           <button onclick="startContinuousCamera()" class="w-full bg-indigo-600 active:bg-indigo-800 text-white py-3 px-3 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition active:scale-[0.99]">
@@ -150,7 +149,7 @@
             <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
               <div id="scanProgressBar" class="bg-indigo-600 h-1.5 w-0 transition-all duration-300"></div>
             </div>
-            <p id="scanProgressLabel" class="text-[11px] text-slate-500 font-bold">กำลังประมวลผลแบบกลุ่ม...</p>
+            <p id="scanProgressLabel" class="text-[11px] text-slate-500 font-bold">กำลังประมวลผลด้วยความเร็วสูงสุด...</p>
           </div>
         </div>
 
@@ -202,7 +201,6 @@
         </div>
       </div>
 
-      <!-- TAB 2: คลังพัสดุ & ของค้าง -->
       <div id="viewInv" class="hidden space-y-3.5">
         <div class="bg-gradient-to-r from-rose-500 to-amber-500 text-white p-3.5 rounded-2xl shadow-sm space-y-2">
           <div class="flex justify-between items-start">
@@ -253,7 +251,6 @@
         </div>
       </div>
 
-      <!-- TAB 3: สถิติรายเดือน -->
       <div id="viewStats" class="hidden space-y-3.5">
         <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 space-y-2.5">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -313,7 +310,6 @@
         </div>
       </div>
 
-      <!-- TAB 4: ตั้งค่าเทมเพลต LINE & ทีมงาน -->
       <div id="viewStaff" class="hidden space-y-3.5">
         <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3 text-xs">
           <div class="border-b border-slate-100 pb-2">
@@ -359,7 +355,6 @@
     </main>
   </div>
 
-  <!-- กล้องถ่ายต่อเนื่อง Fullscreen -->
   <div id="cameraModal" class="fixed inset-0 bg-black z-50 flex flex-col justify-between hidden">
     <div class="p-3 flex justify-between items-center text-white bg-gradient-to-b from-black/80 to-transparent">
       <span class="text-xs font-bold text-rose-400">● โหมดถ่ายต่อเนื่อง</span>
@@ -407,7 +402,7 @@
       }
     }
 
-    // ✅ ส่งภาพแบบกลุ่ม (Batch) รวดเดียว 10 รูป เพื่อแก้ปัญหา High Demand และทำให้เร็วขึ้น 10 เท่า
+    // ✅ ยิงขนาน! แตก array ส่งไปรอบละ 8 ภาพ จะเร็วขึ้นมากๆ 
     async function processImagesViaBackend() {
       const loader = document.getElementById('scanLoaderBox');
       const bar = document.getElementById('scanProgressBar');
@@ -418,13 +413,13 @@
       loader.classList.remove('hidden');
       currentScannedRows = [];
       
-      const chunkSize = 10; // ส่งรวดเดียว 10 ภาพต่อการถาม 1 ครั้ง
+      const chunkSize = 8;
       const totalChunks = Math.ceil(capturedBase64List.length / chunkSize);
       
       for (let i = 0; i < totalChunks; i++) {
         const pct = Math.round(((i) / totalChunks) * 100);
         bar.style.width = `${pct}%`;
-        label.innerText = `AI กำลังวิเคราะห์ชุดที่ ${i + 1} จากทั้งหมด ${totalChunks} ชุด...`;
+        label.innerText = `กำลังอ่านพัสดุด้วยความเร็วสูง...`;
 
         const chunk = capturedBase64List.slice(i * chunkSize, (i + 1) * chunkSize);
         
@@ -444,18 +439,18 @@
           } catch(e) {
             attempt++;
             if (attempt >= 3) {
-              alert(`วิเคราะห์ภาพชุดที่ ${i+1} ล้มเหลว: ${e.message}\nกรุณาลองใหม่อีกครั้งครับ`);
+              alert(`วิเคราะห์ภาพล้มเหลว: ${e.message}`);
               loader.classList.add('hidden');
               return;
             }
-            label.innerText = `ระบบหนาแน่น กำลังลองชุดที่ ${i + 1} ใหม่ (รอบ ${attempt + 1}/3)...`;
-            await new Promise(r => setTimeout(r, 3000));
+            label.innerText = `กำลังลองใหม่...`;
+            await new Promise(r => setTimeout(r, 2000));
           }
         }
       }
 
       bar.style.width = `100%`;
-      label.innerText = `ประมวลผลเสร็จสมบูรณ์!`;
+      label.innerText = `เสร็จสมบูรณ์!`;
       await new Promise(r => setTimeout(r, 500));
       
       loader.classList.add('hidden');
