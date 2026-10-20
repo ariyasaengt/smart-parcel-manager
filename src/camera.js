@@ -1,31 +1,27 @@
-/**
- * Camera helpers: start/stop and capture compress image.
- * Uses canvas to resize & compress JPEG to reduce base64 payload.
- */
-
-export async function startCamera(videoElement, opts = { facingMode: 'environment' }) {
-  const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: opts.facingMode }, audio: false });
-  videoElement.srcObject = s;
-  await videoElement.play();
-  return s;
+export async function startCamera(videoEl) {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment' },
+    audio: false
+  });
+  videoEl.srcObject = stream;
+  await videoEl.play();
+  return stream;
 }
 
 export function stopCamera(stream) {
   if (!stream) return;
-  stream.getTracks().forEach(t => t.stop());
+  stream.getTracks().forEach(track => track.stop());
 }
 
-export function captureToBase64(videoElement, maxWidth = 800, quality = 0.85) {
-  const cvs = document.createElement('canvas');
-  let w = videoElement.videoWidth || maxWidth;
-  let h = videoElement.videoHeight || Math.round((maxWidth / w) * (videoElement.videoHeight || 600));
-  if (w > maxWidth) {
-    h = Math.round((maxWidth / w) * h);
-    w = maxWidth;
-  }
-  cvs.width = w;
-  cvs.height = h;
-  const ctx = cvs.getContext('2d');
-  ctx.drawImage(videoElement, 0, 0, w, h);
-  return cvs.toDataURL('image/jpeg', quality).split(',')[1];
+export function captureImageToBase64(videoEl) {
+  const canvas = document.getElementById('captureCanvas');
+  const width = videoEl.videoWidth || 800;
+  const height = videoEl.videoHeight || 600;
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(videoEl, 0, 0, width, height);
+
+  return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
 }

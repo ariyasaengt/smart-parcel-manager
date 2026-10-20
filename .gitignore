@@ -1,8 +1,4 @@
-# Node artifacts
-node_modules/
-dist/
-.env
-.vscode/
-
-# Mac
+node_modules
+dist
+.vite
 .DS_Store

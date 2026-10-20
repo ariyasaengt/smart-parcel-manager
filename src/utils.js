@@ -1,32 +1,71 @@
-// Generic utilities
-
-export function normalizeThaiName(str = '') {
-  // remove Thai tone marks & normalize whitespace, lowercase for comparisons
-  return String(str).replace(/[่้๊๋์]/g, '').trim().toLowerCase();
+export function normalizeThaiName(value = '') {
+  return String(value).replace(/[่้๊๋์]/g, '').trim().toLowerCase();
 }
 
-export function isSamePerson(nameA = '', nameB = '') {
-  if (!nameA || !nameB) return false;
-  if (nameA === nameB) return true;
-  const a = normalizeThaiName(nameA);
-  const b = normalizeThaiName(nameB);
+export function isSamePerson(a = '', b = '') {
+  if (!a || !b) return false;
   if (a === b) return true;
-  if (!isNaN(Number(a)) || !isNaN(Number(b))) return false;
-  // compare last tokens
-  const pa = a.split(/\s+/), pb = b.split(/\s+/);
-  if (pa.length > 1 && pb.length > 1 && pa[pa.length-1] === pb[pb.length-1]) return true;
-  // small edit-distance heuristic
-  if (Math.abs(a.length - b.length) <= 2) {
+
+  const x = normalizeThaiName(a);
+  const y = normalizeThaiName(b);
+  if (x === y) return true;
+
+  const pa = x.split(/\s+/);
+  const pb = y.split(/\s+/);
+
+  if (pa.length > 1 && pb.length > 1 && pa[pa.length - 1] === pb[pb.length - 1]) return true;
+
+  if (Math.abs(x.length - y.length) <= 2) {
     let diff = 0;
-    const minLen = Math.min(a.length, b.length);
-    for (let i=0;i<minLen;i++) if (a[i]!==b[i]) diff++;
-    diff += Math.abs(a.length - b.length);
+    const minLen = Math.min(x.length, y.length);
+    for (let i = 0; i < minLen; i++) {
+      if (x[i] !== y[i]) diff++;
+    }
+    diff += Math.abs(x.length - y.length);
     if (diff <= 2) return true;
   }
+
   return false;
 }
 
-export function generateId(prefix = 'pkg_') {
-  if (crypto?.randomUUID) return prefix + crypto.randomUUID();
-  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+export function createLineMessage(rows, header, footer) {
+  const grouped = [];
+
+  rows.forEach(item => {
+    const target = String(item.target || '').trim();
+    if (!target || target === 'ไม่ระบุ') return;
+
+    let foundIndex = -1;
+    for (let i = 0; i < grouped.length; i++) {
+      if (isSamePerson(grouped[i].displayName, target)) {
+        foundIndex = i;
+        break;
+      }
+    }
+
+    if (foundIndex >= 0) {
+      grouped[foundIndex].count += 1;
+      if (target.length > grouped[foundIndex].displayName.length) {
+        grouped[foundIndex].displayName = target;
+      }
+    } else {
+      grouped.push({ displayName: target, count: 1 });
+    }
+  });
+
+  const lines = [];
+  if (header) lines.push(header);
+  lines.push(`(รวมทั้งหมด ${rows.length} ชิ้น)`);
+  lines.push('');
+
+  grouped.forEach(g => {
+    lines.push(g.count > 1 ? `ห้อง/ผู้รับ: ${g.displayName} ( ${g.count} ชิ้น )` : `ห้อง/ผู้รับ: ${g.displayName}`);
+  });
+
+  if (footer) {
+    lines.push('');
+    lines.push(footer);
+  }
+
+  return lines.join('\n');
 }

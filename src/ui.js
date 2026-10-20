@@ -1,27 +1,17 @@
-// Minimal toast system & simple helpers (replace alert/confirm)
-export function toast(message, { type = 'info', duration = 3000 } = {}) {
-  let container = document.getElementById('app-toasts');
+export function showToast(message, type = 'info') {
+  const id = 'toast-container';
+  let container = document.getElementById(id);
   if (!container) {
     container = document.createElement('div');
-    container.id = 'app-toasts';
-    container.style.position = 'fixed';
-    container.style.right = '16px';
-    container.style.top = '16px';
-    container.style.zIndex = 9999;
+    container.id = id;
+    container.className = 'fixed right-4 top-4 z-[9999] space-y-2';
     document.body.appendChild(container);
   }
-  const el = document.createElement('div');
-  el.textContent = message;
-  el.style.marginTop = '8px';
-  el.style.padding = '10px 14px';
-  el.style.borderRadius = '8px';
-  el.style.background = type === 'error' ? '#fee2e2' : '#ecfccb';
-  el.style.color = '#111827';
-  container.appendChild(el);
-  setTimeout(() => el.remove(), duration);
-}
 
-export function confirmModal(message) {
-  // simple fallback: use native confirm for now, can be upgraded to accessible dialog
-  return Promise.resolve(window.confirm(message));
+  const el = document.createElement('div');
+  el.className = `rounded-lg border px-3 py-2 text-xs shadow ${type === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`;
+  el.textContent = message;
+  container.appendChild(el);
+
+  setTimeout(() => el.remove(), 3000);
 }

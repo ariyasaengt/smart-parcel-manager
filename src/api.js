@@ -1,44 +1,99 @@
-// API wrapper for Google Apps Script backend.
-// Exposes: postAction(action, payload) and fetchDorm(dormId)
+const GAS_ENDPOINT_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
 
-const GAS_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyfF8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec";
-
-function timeout(ms) {
-  return new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms));
+export function getStoredToken() {
+  return localStorage.getItem('smart_parcel_token') || '';
 }
 
-export async function postAction(action, payload = {}, opts = {}) {
-  const url = GAS_ENDPOINT_URL;
-  const body = JSON.stringify(Object.assign({ action }, payload));
-  const controller = new AbortController();
-  const timeoutMs = opts.timeout || 15000;
-
-  const fetchPromise = fetch(url, {
+export async function callGas(payload) {
+  const token = getStoredToken();
+  const response = await fetch(GAS_ENDPOINT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json;charset=utf-8' },
-    body,
-    signal: controller.signal
-  }).then(async (res) => {
-    const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      throw new Error('Invalid JSON from backend');
-    }
+    headers: {
+      'Content-Type': 'application/json;charset=utf-8'
+    },
+    body: JSON.stringify({
+      ...payload,
+      ...(token ? { token } : {})
+    })
   });
 
-  const race = Promise.race([fetchPromise, timeout(timeoutMs)]);
+  const text = await response.text();
   try {
-    return await race;
+    return JSON.parse(text);
   } catch (err) {
-    controller.abort();
-    throw err;
+    throw new Error('Invalid JSON response from backend');
   }
 }
 
-export async function fetchDorm(dormId) {
-  const url = `${GAS_ENDPOINT_URL}?dormId=${encodeURIComponent(dormId)}`;
-  const res = await fetch(url, { method: 'GET' });
-  if (!res.ok) throw new Error('Network response was not ok');
-  return await res.json();
+export async function login(username, password) {
+  const result = await callGas({ action: 'login', username, password });
+  if (result.status === 'success') {
+    localStorage.setItem('smart_parcel_token', result.token);
+    return result.user;
+  }
+  throw new Error(result.message || 'login failed');
+}
+
+export async function registerOwner(dormName, username, password) {
+  const result = await callGas({ action: 'register_owner', dormName, username, password });
+  if (result.status === 'success') {
+    localStorage.setItem('smart_parcel_token', result.token);
+    return result.user;
+  }
+  throw new Error(result.message || 'register failed');
+}
+
+export async function verifySession() {
+  const token = getStoredToken();
+  if (!token) return null;
+
+  const result = await callGas({ action: 'verify_session', token });
+  if (result.status === 'success') {
+    return result.user;
+  }
+
+  localStorage.removeItem('smart_parcel_token');
+  return null;
+}
+
+export async function fetchParcels(dormId) {
+  const response = await fetch(`${GAS_ENDPOINT_URL}?dormId=${encodeURIComponent(dormId)}`);
+  const json = await response.json();
+  return json.data || [];
+}
+
+export async function saveParcels(dormId, items) {
+  const result = await callGas({ action: 'save_parcels', dormId, items });
+  if (result.status !== 'success') throw new Error(result.message || 'save failed');
+  return result;
+}
+
+export async function markReceived(dormId, parcelId) {
+  const result = await callGas({ action: 'mark_received', dormId, id: parcelId });
+  if (result.status !== 'success') throw new Error(result.message || 'mark failed');
+  return result;
+}
+
+export async function clearAllParcels(dormId) {
+  const result = await callGas({ action: 'clear_all_parcels', dormId });
+  if (result.status !== 'success') throw new Error(result.message || 'clear failed');
+  return result;
+}
+
+export async function saveDormSettings(dormId, tplHeader, tplFooter) {
+  const result = await callGas({ action: 'save_dorm_settings', dormId, tplHeader, tplFooter });
+  if (result.status !== 'success') throw new Error(result.message || 'save settings failed');
+  return result;
+}
+
+export async function addStaff(dormId, dormName, username, password) {
+  const result = await callGas({ action: 'add_staff', dormId, dormName, newStaffUsername: username, newStaffPassword: password });
+  if (result.status !== 'success') throw new Error(result.message || 'add staff failed');
+  return result;
+}
+
+export async function aiScanBatch(base64List) {
+  const result = await callGas({ action: 'ai_scan_batch', base64List });
+  if (result.status !== 'success') throw new Error(result.message || 'AI scan failed');
+  return result.result || [];
 }
