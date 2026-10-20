@@ -1,4 +1,4 @@
-const GAS_ENDPOINT_URL = 'PASTE_YOUR_WEB_APP_URL_HERE';
+const GAS_ENDPOINT_URL = 'https://script.google.com/macros/s/AKfycbwphltYrBk_o_CCQOiWjO8_syGyf8sqsJ5APtSDvOHC5kjT3VUfi0zka3GuV-WRDp0ew/exec';
 
 export function getStoredToken() {
   return localStorage.getItem('smart_parcel_token') || '';
